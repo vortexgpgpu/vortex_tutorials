@@ -50,13 +50,13 @@ intrinsic
 
 ## Step 6: Debuging guide 
 ### Debug Sim-X : 
-![](assignment5_fig1.png)
+![](figs/assignment5_fig1.png)
  
 ### Debug RTL 
 - Look at kernel.dump which shows the assembly code.
-![](assignment5_fig2.png)
+![](figs/assignment5_fig2.png)
 - Identify the prefetched instructions (0x800000b8) instruction is not decoded so it’s probably a prefetch intrinsic that you inserted. 
-![](assignment5_fig3.png)
+![](figs/assignment5_fig3.png)
 - In the debug log, search for 0x800000b8  PC address 
 
 - And then search for the address in the addr={} e.g. 0x9d822409 

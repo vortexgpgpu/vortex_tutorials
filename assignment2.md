@@ -1,4 +1,4 @@
-#assignment #2
+#Assignment #2
 
 In this assignment, you will study the memory system. 
 
