@@ -52,5 +52,4 @@ You can change the program workload to the following values 16, 32, 64, 128:
     ./ci/blackbox.sh --cores=4 --app=demo --perf --args=”-n128” 
 
 Vortex Source Code Location: 
-https://github.com/vortexgpgpu/vortex 
-(Links to an external site.)
+https://github.com/vortexgpgpu/vortex
