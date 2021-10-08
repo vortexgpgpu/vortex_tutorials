@@ -23,7 +23,7 @@ In this same macro, remember to assign this register to the counter we defined e
 
         assign perf_pipeline_if.active_threads = perf_active_threads;
 
-Next, the logic for counting the total number of active threads must be written in VX_issue.sv. Once this is done, the active number of threads should be divided by the total number of cycles in /Vortex/driver/common/vx_utils.cpp and printed out. You can start by adding this counter in the function "vx_dump_perf" under the first "#ifdef PERF_ENABLE" macro:
+Next, the logic for counting the total number of active threads must be written in VX_issue.sv. Once this is done, the number of active threads should be divided by the total number of cycles in /Vortex/driver/common/vx_utils.cpp and printed out. You can start by adding this counter in the function "vx_dump_perf" under the first "#ifdef PERF_ENABLE" macro:
 
       uint64_t active_threads = 0;
 
@@ -51,5 +51,11 @@ You can change the program workload to the following values 16, 32, 64, 128:
     ./ci/blackbox.sh --cores=4 --app=demo --perf --args=”-n64” 
     ./ci/blackbox.sh --cores=4 --app=demo --perf --args=”-n128” 
 
+
 Vortex Source Code Location: 
 https://github.com/vortexgpgpu/vortex
+
+# What to submit
+󠛡[1] PERF: average number of active threads per cycle for 16, 32, 64, 128 cases. 
+[2] Screenshots that show your code changes. Alternatively, you can put your github link. 
+
