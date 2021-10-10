@@ -1,8 +1,6 @@
 # Assignment #5: How to add a new instruction 
 
-In this assignment, we will learn how to add a new instruction using intrinsics and by extending the pipeline. You are adding a software prefetch instruction. It's a new instruction, so we have to modify Sim-X, which is a functional simulator of Vortex before adding the new instruction in the pipeline (RTL programming). Since this is a new instruction that is not currently supported by the RISC-V toolchain, we have to insert the new instruction using assembly code. 
-
-In this assignment, you will add a new software prefetch instruction. You will first learn how to add a new instruction in simX (a functional simulator of Vortex) followed by adding a new instruction in the pipeline (RTL programming). 
+In this assignment, we will learn how to add a new instruction using intrinsics and by extending the pipeline. You will add a software prefetch instruction. You have to modify Sim-X, a functional simulator of Vortex before adding the new instruction in the pipeline (RTL programming). Since software prefetch is an instruction that is not currently supported by the RISC-V toolchain, you will first have to insert the new instruction using assembly code. 
 
 ---
 
