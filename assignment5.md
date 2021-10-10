@@ -279,4 +279,6 @@ Device running...
   186141: D$0 Rsp: wid=3, PC=800000cc, tmask=1000, tag=6,   rd=11, data={0x3fc, 0x6ee0a219, 0xe6d2de87, 0x65bcc4e0}addr=  {0xab94912e, 0xab9490ee, 0xab9490ae, 0xab94906e}, is_dup=0,   rsp_is_prefetch=1, instr_is_prefetch=0
   ```
 
+- As expected, we get 8 responces from the D-cache, each responce corresponding to the request tag.
+  
 ---
