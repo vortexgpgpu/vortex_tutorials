@@ -1,6 +1,18 @@
 # Solution for Assignment #3:How to add a HW prefetcher
 
+## Download and execute the solution:
+
 **Source code of the solution: [Pull Request #22](https://github.com/vortexgpgpu/vortex/pull/22)**
+
+```bash
+git clone  --recursive https://github.com/vortexgpgpu/vortex.git
+# Assignment3 solution is the #22 Pull Request in Vortex repo
+git fetch origin pull/22/head:A3_solution
+git checkout A3_solution
+make
+# execute the demo
+./ci/blackbox.sh --cores=4 --app=demo --perf --debug
+```
 
 ## Overview of the solution:
 
