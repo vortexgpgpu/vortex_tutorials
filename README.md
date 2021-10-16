@@ -30,7 +30,7 @@ How to register: [MICRO54 register link](https://whova.com/portal/registration/m
 |11:55 - 12:05 | Running Vortex on FPGA | Liam Cooper |  | |
 |12:05 - 12:30 | Introduction of tutorial assignments and assignment #1 demo | Liam Cooper | | | 
 |12:30 - 12:40 | Conclusions & Discussions |  Hyesoon Kim | | 
-|12:40 - 1:00 |  Help for tutorial  | Liam/Blaise/Ruobing/Santosh| | | 
+|12:40 - 1:00 |  Help for tutorial  | | | | 
 
 
 ## Tutorial Assignments 
@@ -40,6 +40,9 @@ How to register: [MICRO54 register link](https://whova.com/portal/registration/m
 * [assignment3](assignment3.md) and [assignment4](assignment4.md): adding hardware prefetcher and how to debug 
 * [assignment5](assignment5.md) adding software prefetching & Sim-X modification 
 
+
+## Mailing list 
+For tutorial's info please join vortex-dev@lists.gatech.edu 
 
 
 ## VM Images & temp accounts 
