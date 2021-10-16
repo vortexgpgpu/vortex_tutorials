@@ -2,27 +2,16 @@
 
 Description:
 
-[Vortex](http://vortex.cc.gatech.edu/)  is an open source Hardware and Software project to support GPGPU based on RISC-V ISA extensions. Currently Vortex supports OpenCL/CUDA and it runs on FPGA. The vortex platform is highly customizable and scalable with a complete open source compiler, driver and runtime software stack to enable research in GPU architectures. 
-
-[Vortex Homepage](http://vortex.cc.gatech.edu/) 
-
-[Vortex Github](https://github.com/vortexgpgpu/) 
+[Vortex](http://vortex.cc.gatech.edu/)  is an [open source](https://github.com/vortexgpgpu/) Hardware and Software project to support GPGPU based on RISC-V ISA extensions. Currently Vortex supports OpenCL/CUDA and it runs on FPGA. The vortex platform is highly customizable and scalable with a complete open source compiler, driver and runtime software stack to enable research in GPU architectures. 
 
 
-Data: 2021-10-18 (10:00 AM EDT- 1:00 PM EDT)
+## Date: 2021-10-18 (10:00 AM EDT- 1:00 PM EDT)
 
-Organizers:
+## Organizers:
 
-Hyesoon Kim (Georgia Institute of Technology) 
+Hyesoon Kim,  Blaise Tine, Ruobing Han, Liam Cooper, Jeff Young (Georgia Institute of Technology) 
 
-Blaise Tine (Georgia Institute of Technology) 
-
-Ruobing Han (Georgia Institute of Technology) 
-
-Liam Cooper (Georgia Institute of Technology)
-
-Jeff Young (Georgia Institute of Technology) 
-
+## Registration 
 
 How to register: [MICRO54 register link](https://whova.com/portal/registration/miism_202110/) 
 
@@ -46,10 +35,10 @@ How to register: [MICRO54 register link](https://whova.com/portal/registration/m
 
 ## Tutorial Assignments 
 
-* [assignment1.md](assignment1.md) and [assignment2.md](assignment2.md): adding simple hardware performance counters. 
+* [assignment1](assignment1.md) and [assignment2](assignment2.md): adding simple hardware performance counters. 
 
-* [assignment3.md](assignment3.md) and [assignment4.md](assignment4.md): adding hardware prefetcher and how to debug 
-* [assignment5.md](assignment5.md) adding software prefetching & Sim-X modification 
+* [assignment3](assignment3.md) and [assignment4](assignment4.md): adding hardware prefetcher and how to debug 
+* [assignment5](assignment5.md) adding software prefetching & Sim-X modification 
 
 
 
