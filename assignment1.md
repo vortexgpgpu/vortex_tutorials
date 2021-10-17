@@ -23,7 +23,7 @@ You will be using the “CSR_MPM_ACTIVE_THREADS” and “CSR_MPM_ACTIVE_THREADS
 
 In this same macro, remember to assign this register to the counter we defined earlier in the interface:
 
-    assign perf_pipeline_if.active_threads = perf_active_threads;
+	assign perf_pipeline_if.active_threads = perf_active_threads;
 
 Next, the logic for counting the total number of active threads must be written in VX_issue.sv.
 
