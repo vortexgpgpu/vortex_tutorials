@@ -45,16 +45,15 @@ How to register: [MICRO54 register link](https://whova.com/portal/registration/m
 For tutorial's info please join vortex-dev@lists.gatech.edu 
 
 
-## VM Images & temp accounts 
-Information will be provided soon. 
+## VM Images and Remote Temporary Accounts
 
+Please see the ["VM README"](VM_Imgs/VM_README.md) to get instructions for downloading and running the Vortex tools using Vagrant and VirtualBox. 
+
+For remote account access, please see this page.
 
 ## Relevant Repos 
 
-Vortex 
-POCL 
-CUDA 
-
-## Set up instructions 
+* [Vortex](https://github.com/vortexgpgpu/vortex) 
+* [POCL](http://portablecl.org) 
 
 
