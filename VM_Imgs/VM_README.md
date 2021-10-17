@@ -31,9 +31,12 @@ on Linux and Windows 10 with Vagrant 2.2.18 and VirtualBox 6.1.26.
 1) Download the Vortex Vagrant Box image and the updated Vagrantfile to your computer
     * If you need to increase/decrease the number of cores used by the VM, you can make this change in the Vagrantfile.
 
-2) Import the Vagrant Box image using the command-line
+2) Import the Vagrant Box image using the command-line and start the VM
 
 ```
+# We create a new local VM image from the vortex-ubuntu18 .box file and 
+# then initialize a Vagrantfile with `vagrant init`
+
 vagrant box add vortex-micro vortex-ubuntu18
 vagrant init vortex-micro
 vagrant up
