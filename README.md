@@ -49,7 +49,7 @@ For tutorial's info please join vortex-dev@lists.gatech.edu
 
 Please see the ["VM README"](VM_Imgs/VM_README.md) to get instructions for downloading and running the Vortex tools using Vagrant and VirtualBox. 
 
-For remote account access, please see this page.
+For remote account access, please see this page. If you'd like a longer-term account to work with Vortex and the tools, please [request an account for the Rogues Gallery testbed here](https://crnch-rg.cc.gatech.edu/request-access/).
 
 ## Relevant Repos 
 
