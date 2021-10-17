@@ -38,13 +38,19 @@ vagrant box add vortex-micro vortex-ubuntu18
 vagrant init vortex-micro
 vagrant up
 ```
-Once it completes "booting VM..." you can ssh into the VM.
+Once it completes booting and returns back to the command prompt you can ssh into the VM.
+
+![Successful Boot Screen](../blob/main/VM_Imgs/screenshots/windows/vagrant_tutorial_windows10_2.png)
 
 ```
 vagrant ssh
 ```
 
 3) When you are finished working with the VM, make sure to exit your session and run `vagrant halt` to power
-the VM down.
+the VM down. It is preferred to halt the VM with Vagrant than using the VirtualBox manager to power down the VM 
+due to the additional setup steps that Vagrant performs.
+
+Note that you can see and log into the VM using the VirtualBox Manager GUI. Just remember to start/stop the image with
+Vagrant, if possible.
 
 
