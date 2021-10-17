@@ -40,7 +40,7 @@ vagrant up
 ```
 Once it completes booting and returns back to the command prompt you can ssh into the VM.
 
-![Successful Boot Screen](../blob/main/VM_Imgs/screenshots/windows/vagrant_tutorial_windows10_2.png)
+![Successful Boot Screen](../screenshots/windows/vagrant_tutorial_windows10_2.png)
 
 ```
 vagrant ssh
