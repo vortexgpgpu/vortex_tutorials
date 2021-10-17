@@ -29,12 +29,18 @@ on Linux and Windows 10 with Vagrant 2.2.18 and VirtualBox 6.1.26.
 * [Vagrant Box with prebuilt toolchains and Vortex repo (1.5 GB)](https://gatech.app.box.com/s/6rdnn96glytc87sfehq8dnmd82e4q44y)
 * [Vagrantfile - place in the same folder as your .box file](Vagrantfile)
 
+#### Tutorial Setup - All Platforms
+Once you have booted your VM from the instructions below, you should follow these steps to prepare for the hands-on portion of the tutorial:
+
+* Source the `set_vortex_env.sh` script to set your paths
+* Proceed to the Exercises section of this repo.
+
 #### Windows Setup
 
 1) Download the Vortex Vagrant Box image ([from Box]()) and the updated Vagrantfile ([from this repo](Vagrantfile)) to your computer
     * Note that the VM box image is **1.5 GB**, and it requires **4 GB of local disk space**.
     * The VagrantFile includes some tweaks to disable serial adapters which can cause a boot error.
-    * If you need to increase/decrease the number of cores used by the VM, you can also make this change in the Vagrantfile.
+    * If you need to increase/decrease the number of cores used by the VM, you can also make this change in the Vagrantfile. 
 
 2) Import the Vagrant Box image using the command-line and start the VM
 
