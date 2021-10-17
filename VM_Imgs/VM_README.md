@@ -8,13 +8,7 @@ We also provide the base Vagrantfile we use, although we note that setup may req
 See "Building Vortex from Scratch" for more details on setting up a new VM and/or a base installation of the
 tools.
 
-
-## VM Usage Instructions
-
-First you will need to install [Vagrant](https://www.vagrantup.com) and [VirtualBox](). We have tested
-on Linux and Windows 10 with Vagrant 2.2.18 and VirtualBox 6.1.26.
-
-#### Important note for Apple Macbook M1 users
+### Important note for Apple Macbook M1 users
 VirtualBox is not supported on M1 laptops and systems due to the switch from an x86 to aarch64 processor.
 You can technically use a Vagrantfile with Docker, but we haven't tested this and can't confirm that it
 works as expected. Success would depend on whether all the required packages can be installed for aarch64 
@@ -23,6 +17,12 @@ is one possible Vagrant setup that could be investigated if you are interested.
 
 For this tutorial, we recommend using the remote server rather than the local VM if you only have local
 access to an M1 device.
+
+
+## VM Usage Instructions
+
+**First** you will need to install [Vagrant](https://www.vagrantup.com) and [VirtualBox](). We have tested
+on Linux and Windows 10 with Vagrant 2.2.18 and VirtualBox 6.1.26.
 
 ### Vagrant set up and initialization
 
