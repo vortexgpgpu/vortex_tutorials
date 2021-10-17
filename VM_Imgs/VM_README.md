@@ -26,7 +26,7 @@ on Linux and Windows 10 with Vagrant 2.2.18 and VirtualBox 6.1.26.
 
 ### Vagrant set up and initialization
 
-* [Vagrant Box setup with prebuilt toolchains](https://gatech.app.box.com/s/6rdnn96glytc87sfehq8dnmd82e4q44y)
+* [Vagrant Box with prebuilt toolchains and Vortex repo (1.5 GB)](https://gatech.app.box.com/s/6rdnn96glytc87sfehq8dnmd82e4q44y)
 * [Vagrantfile - place in the same folder as your .box file](Vagrantfile)
 
 #### Windows Setup
