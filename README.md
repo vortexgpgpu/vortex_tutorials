@@ -44,17 +44,18 @@ How to register: [MICRO54 register link](https://whova.com/portal/registration/m
 ## Mailing list 
 For tutorial's info please join vortex-dev@lists.gatech.edu 
 
+## VM Images and Remote Temporary Accounts
 
-## VM Images & temp accounts 
 [Remote Access for the MICRO-54 Vortex GPGPU tutorial](https://github.com/gt-crnch-rg/vortex_tutorials/blob/main/Remote%20Access%20for%20the%20MICRO-54%20Vortex%20GPGPU%20tutorial.md)
 
+VM Access (Optional): Please see the ["VM README"](VM_Imgs/VM_README.md) to get instructions for downloading and running the Vortex tools using Vagrant and VirtualBox. 
+
+For remote account access, please see [this page](Remote%20Access%20for%20the%20MICRO-54%20Vortex%20GPGPU%20tutorial.md). If you'd like a longer-term account to work with Vortex and the tools, please [request an account for the Rogues Gallery testbed here](https://crnch-rg.cc.gatech.edu/request-access/).
 
 ## Relevant Repos 
 
-Vortex 
-POCL 
-CUDA 
+* [Vortex](https://github.com/vortexgpgpu/vortex) 
+* [POCL](http://portablecl.org) 
 
-## Set up instructions 
-[Use pre-build toolchain](https://github.com/vortexgpgpu/vortex/blob/master/doc/execute_opencl_on_vortex.md)(Ubuntu18.04 users only)
-
+## Tutorial Set Up instructions 
+* [Use pre-built toolchain](https://github.com/vortexgpgpu/vortex/blob/master/doc/execute_opencl_on_vortex.md)(Ubuntu18.04 users only)
