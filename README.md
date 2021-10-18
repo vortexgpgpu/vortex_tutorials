@@ -21,8 +21,7 @@ How to register: [MICRO54 register link](https://whova.com/portal/registration/m
 
 |  Time | Contents  | Presenter   | Slides  | Notes  |
 |---|---|---|---|---|
-| 10:00-10:20 |   Introduction of vortex and GPGPU backgrounds
-|Hyesoon Kim  | [slides0](Slides/0.tutorial_introduction.pptx) [slides1](Slides/1.gpu_arch.pptx)  |   |
+| 10:00-10:20 |   Introduction of vortex and GPGPU backgrounds |Hyesoon Kim  | [slides0](Slides/0.tutorial_introduction.pptx) [slides1](Slides/1.gpu_arch.pptx)  |   |
 | 10:20-10:40  |  Vortex microarchitecture Basic   |  Blaise Tine | [slides2](Slides/2.vortex_microarchitecture.pptx)  |   |
 | 10:40-11:10  |  Vortex code structure review   |    Blaise Tine  | [slides3](Slides/3.code_structure.pptx)  |   |
 | 11:10-11:30  |  Introduction of Vortex software stack | Ruobing Han
