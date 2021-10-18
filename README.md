@@ -24,8 +24,7 @@ How to register: [MICRO54 register link](https://whova.com/portal/registration/m
 | 10:00-10:20 |   Introduction of vortex and GPGPU backgrounds |Hyesoon Kim  | [slides0](Slides/0.tutorial_introduction.pptx) [slides1](Slides/1.gpu_arch.pptx)  |   |
 | 10:20-10:40  |  Vortex microarchitecture Basic   |  Blaise Tine | [slides2](Slides/2.vortex_microarchitecture.pptx)  |   |
 | 10:40-11:10  |  Vortex code structure review   |    Blaise Tine  | [slides3](Slides/3.code_structure.pptx)  |   |
-| 11:10-11:30  |  Introduction of Vortex software stack | Ruobing Han
-| [slides4](Slides/4.vortex_software_stack.pptx) |  | 
+| 11:10-11:30  |  Introduction of Vortex software stack | Ruobing Han | [slides4](Slides/4.vortex_software_stack.pptx) |  | 
 | 11:30-11:45  |  Running OpenCL/Cuda on Vortex | Ruobing Han |[slides5](Slides/5.vortex_opencl_cuda_support.pptx)   |  | 
 | 11:45-11:55 | Break   |  |  | 
 |11:55 - 12:05 | Running Vortex on FPGA | Liam Cooper | [demo_video](Slides/vortex_fpga_demo.mp4) | |
