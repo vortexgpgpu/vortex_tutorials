@@ -72,3 +72,23 @@ Vagrant, if possible.
 
 ![VirtualBox Example Win10](screenshots/windows/vagrant_tutorial_windows10_4.png)
 
+#### Linux Setup (Ubuntu 18)
+
+Install Vagrant and Virtualbox using either the downloads above or by using apt.
+
+```
+apt install vagrant virtualbox
+```
+
+Then you will follow the same steps as above for the Windows setup.
+
+2) Import the Vagrant Box image using the command-line and start the VM
+
+```
+# We create a new local VM image from the vortex-ubuntu18 .box file and 
+# then initialize a Vagrantfile with `vagrant init`
+
+vagrant box add vortex-micro vortex-ubuntu18
+vagrant init vortex-micro
+vagrant up
+```
