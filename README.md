@@ -44,8 +44,6 @@ How to register: [MICRO54 register link](https://whova.com/portal/registration/m
 ## Mailing list 
 For tutorial's info please join vortex-dev@lists.gatech.edu 
 
-
-<<<<<<< HEAD
 ## VM Images and Remote Temporary Accounts
 
 [Remote Access for the MICRO-54 Vortex GPGPU tutorial](https://github.com/gt-crnch-rg/vortex_tutorials/blob/main/Remote%20Access%20for%20the%20MICRO-54%20Vortex%20GPGPU%20tutorial.md)
