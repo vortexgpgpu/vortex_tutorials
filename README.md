@@ -35,10 +35,10 @@ How to register: [MICRO54 register link](https://whova.com/portal/registration/m
 
 ## Tutorial Assignments 
 
-* [assignment1](assignment1.md) and [assignment2](assignment2.md): adding simple hardware performance counters. 
+* [assignment1](Exercises/assignment1.md) and [assignment2](Exercises/assignment2.md): adding simple hardware performance counters. 
 
-* [assignment3](assignment3.md) and [assignment4](assignment4.md): adding hardware prefetcher and how to debug 
-* [assignment5](assignment5.md) adding software prefetching & Sim-X modification 
+* [assignment3](Exercises/assignment3.md) and [assignment4](Exercises/assignment4.md): adding hardware prefetcher and how to debug 
+* [assignment5](Exercises/assignment5.md) adding software prefetching & Sim-X modification 
 
 
 ## Mailing list 
