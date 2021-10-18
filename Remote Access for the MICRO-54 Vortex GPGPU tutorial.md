@@ -6,7 +6,7 @@ We have set up some temporary accounts for you to use the Vortex toolchain on th
 
 For this tutorial you will be assigned a tutorial user number 1-20, and you will use this to login. The password will be shared in the chat for the tutorial.
 
-To login to the CRNCH server you will use the username **micro21_user<yournumber>** to log in to **hawksbill.crnch.gatech.edu**.
+To login to the CRNCH server you will use the username **micro21_user|yournumber|** to log in to **hawksbill.crnch.gatech.edu**.
 
 ```
 $ ssh micro21_user2@notebook.crnch.gatech.edu
