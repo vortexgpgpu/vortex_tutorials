@@ -46,7 +46,7 @@ For tutorial's info please join vortex-dev@lists.gatech.edu
 
 
 ## VM Images & temp accounts 
-Information will be provided soon. 
+[Remote Access for the MICRO-54 Vortex GPGPU tutorial](https://github.com/gt-crnch-rg/vortex_tutorials/blob/main/Remote%20Access%20for%20the%20MICRO-54%20Vortex%20GPGPU%20tutorial.md)
 
 
 ## Relevant Repos 
@@ -56,5 +56,5 @@ POCL
 CUDA 
 
 ## Set up instructions 
-
+[Use pre-build toolchain](https://github.com/vortexgpgpu/vortex/blob/master/doc/execute_opencl_on_vortex.md)(Ubuntu18.04 users only)
 
