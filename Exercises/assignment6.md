@@ -50,3 +50,13 @@ The prefetch kernel that you used for Assignment 5 generates multiple prefetch r
 - Look at how `addr_matches` is implemented to get an idea of how to implement the late prefetch counter.
 
 ---
+
+## Verifying Your Results:
+
+You can verify your results by running:
+
+``` bash
+./ci/blackbox.sh --driver=rtlsim --cores=1 --app=unused_late_prefetch
+```
+\# of late unused prefetches = 2 \
+\# of late prefetches = 1
