@@ -58,5 +58,5 @@ You can verify your results by running:
 ``` bash
 ./ci/blackbox.sh --driver=rtlsim --cores=1 --app=unused_late_prefetch --perf
 ```
-\# of late unused prefetches = 2 \
+\# of unused prefetched blocks = 2 \
 \# of late prefetches = 1
