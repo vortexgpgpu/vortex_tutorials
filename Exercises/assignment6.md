@@ -24,7 +24,7 @@ You will need to extend the metadata tag in the bank to incorporate an additiona
 
 ### 2a: Counter for the number of unique prefetch requests to memory:
 
-The prefetch kernel that you used for Assignment 5 generates multiple prefetch requests to the same address. A unique prefetch request is the first request generated for that address and that to main memory.
+The prefetch kernel that you used for Assignment 5 generates multiple prefetch requests to the same address. A unique prefetch request is the first request generated for that address that misses in the cache and goes to main memory. Any subsequent requests to the same address result in a cache hit.
 
 ### Hints
 - Use the `mreq_push` signal in `VX_bank.sv`.
