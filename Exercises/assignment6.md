@@ -33,7 +33,7 @@ The prefetch kernel that you used for Assignment 5 generates multiple prefetch r
 
 ### 2b: Counter for the number of unused prefetched blocks:
 
-- In part 1 of this assignment, you added a prefetch bit to the `core_req_tag` to indictae whether an ***instruction was a software prefetch***. Now, you need to add this bit to the tag store in VX_tag_access.sv to indicate whether a ***block was brought in by a prefetch request***.
+- In part 1 of this assignment, you added a prefetch bit to the `core_req_tag` to indictae whether an ***instruction was a software prefetch***. Now, you need to add this bit to the tag store in VX_tag_access.sv to indicate whether a ***block has been brought in by a prefetch request***.
 - You need to add a new data structure in stage 1 of the cache pipeline (the same stage as the data access) to store information about whether a cache block has been used or not. Look at `VX_tag_access.sv` for an idea of how this can be done. This information is universal and is applicable for every cache block. 
 - The first point comes into picture since you want to know whether a ***prefetched block*** has been used or not.
 - An important point to note is that we know whether a block has been used/unused only during a ***fill operation*** since that is when the block is evicted from the cache.
