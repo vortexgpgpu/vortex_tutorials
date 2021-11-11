@@ -1,6 +1,6 @@
 ## Assignment #6: Adding Performance Counters to Test Vortex's Software Prefetcher
 
-This assignment is an extension of Assignment #1 and #5. This assignment is divided into two parts. The first part involves extending the tag in the cache to include a prefetch bit. The second involves adding three performance counters to measure the following metrics: 
+This assignment is an extension of Assignments #1 and #5. It is divided into two parts. The first part involves extending the tag in the cache to include a prefetch bit. The second involves adding three performance counters to measure the following metrics: 
 1. Number of unique prefetch requests to main memory.
 2. Number of unused prefetched blocks.
 3. Number of late prefetches.
@@ -24,7 +24,7 @@ You will need to extend the metadata tag in the bank to incorporate an additiona
 
 ### 2a: Counter for the number of unique prefetch requests to memory:
 
-The prefetch kernel that you used for Assignment 5 generates multiple prefetch requests to the same address. A unique prefetch request is the first request generated for that address and goes to main memory.
+The prefetch kernel that you used for Assignment 5 generates multiple prefetch requests to the same address. A unique prefetch request is the first request generated for that address and that to main memory.
 
 ### Hints
 - Use the `mreq_push` signal in `VX_bank.sv`.
@@ -33,7 +33,7 @@ The prefetch kernel that you used for Assignment 5 generates multiple prefetch r
 
 ### 2b: Counter for the number of unused prefetched blocks:
 
-- In part 1 of this assignment, you added a prefetch bit to the `core_req_tag`. Now, you need to add this bit to the tag store in VX_tag_access.sv to indicate whether a ***block was brought in by a prefetch request***.
+- In part 1 of this assignment, you added a prefetch bit to the `core_req_tag` to indictae whether an ***instruction was a software prefetch***. Now, you need to add this bit to the tag store in VX_tag_access.sv to indicate whether a ***block was brought in by a prefetch request***.
 - You need to add a new data structure in stage 1 of the cache pipeline (the same stage as the data access) to store information about whether a cache block has been used or not. Look at `VX_tag_access.sv` for an idea of how this can be done. This information is universal and is applicable for every cache block. 
 - The first point comes into picture since you want to know whether a **prefetched block** has been used or not.
 - An important point to note is that we know whether a block has been used/unused only during a ***fill operation*** since that is when the block is evicted from the cache.
