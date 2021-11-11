@@ -56,7 +56,7 @@ The prefetch kernel that you used for Assignment 5 generates multiple prefetch r
 You can verify your results by running:
 
 ``` bash
-./ci/blackbox.sh --driver=rtlsim --cores=1 --app=unused_late_prefetch
+./ci/blackbox.sh --driver=rtlsim --cores=1 --app=unused_late_prefetch --perf
 ```
 \# of late unused prefetches = 2 \
 \# of late prefetches = 1
