@@ -1,7 +1,5 @@
 ## Assignment #6: Adding Performance Counters to Test Vortex's Software Prefetcher
 
----
-
 This assignment is an extension of Assignment #1 and #5. This assignment is divided into two parts. The first part involves extending the tag in the cache to include a prefetch bit. The second involves adding three performance counters to measure the following metrics: 
 1. Number of unique prefetch requests to main memory.
 2. Number of unused prefetched blocks.
