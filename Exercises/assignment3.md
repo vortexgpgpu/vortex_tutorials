@@ -2,7 +2,7 @@
 
 In this assignment, you will add a next line prefetcher in the memory system. 
  
-![](figs/assignment3_fig1.png)
+![](../figs/assignment3_fig1.png)
  
 * The `LSU` unit takes a vector of addresses. It also includes status bits like read and valid bit for each of the threads. The `LSU` unit starts with an adder that adds the offset to each of the base addresses and computes the address of load/store. 
 
@@ -15,9 +15,9 @@ The processor generates memory addresses and inserts the new memory address into
 `VX_pipe_register`. Since `VX_pipe_register` takes only one memory request at a time, we need to insert a mux to choose between demand memory request and prefetch request. 
 The VX pipe register takes the input and outputs it in the next cycle. The output of the `VX_pipe_register` is then fed to the index buffer and sent to the cache. This makes sure the output changes only at clock edges. 
  
-![](figs/assignment3_fig2.png)
+![](../figs/assignment3_fig2.png)
   
-![](figs/assignment3_fig3.png)
+![](../figs/assignment3_fig3.png)
 
 The `stall_in` signal acts as an enable for the pipe register. `stall_in` checks that there is a valid request and that we are ready(the cache is not busy) to push that request into the pipe register. When both these conditions are met, we enable input into the pipe register. 
 
