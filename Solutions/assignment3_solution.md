@@ -18,14 +18,14 @@ make
 
 ### Step 1: Insert addr+4 into `req_pipe_reg` for pre_fetch load.
 
-For background knowledge of `handsake`, please see this [link](http://fpgacpu.ca/fpga/handshake.html).
+For background knowledge of `handshake`, please see this [link](http://fpgacpu.ca/fpga/handshake.html).
 Without prefetch, a whole process of a normal load request is as following:
 
-1. VX_issue provides `full_addr` and set `valid bit` to 1. VX_issue will keep holding `full_addr` until handsake has done.
+1. VX_issue provides `full_addr` and set `valid bit` to 1. VX_issue will keep holding `full_addr` until handshake has done.
 2. VX_lsu_unit will set `ready bit` to 1 as long as it's ready to execute new instruction.
-3. At the cycle when both `valid bit` and `ready bit` are 1, handsake is done, VX_issue will move to next instructions, and VX_lsu_unit accepts the `full_addr`, store this address into `req_pipe_reg`, and executes load/store accordingly.
+3. At the cycle when both `valid bit` and `ready bit` are 1, handshake is done, VX_issue will move to next instructions, and VX_lsu_unit accepts the `full_addr`, store this address into `req_pipe_reg`, and executes load/store accordingly.
 
-When there is a prefetch, after the handsake has done, we have to provide a new request to VX_lsu_unit for the prefetch and insert it into `req_pipe_reg`. For detailed information, please see [source code](https://github.com/vortexgpgpu/vortex/pull/22/files#diff-e7c7dffbfe7b26e92b9b1675965b8920f4acaf6c337f1a53d837738231898465R57).
+When there is a prefetch, after the handshake has done, we have to provide a new request to VX_lsu_unit for the prefetch and insert it into `req_pipe_reg`. For detailed information, please see [source code](https://github.com/vortexgpgpu/vortex/pull/22/files#diff-e7c7dffbfe7b26e92b9b1675965b8920f4acaf6c337f1a53d837738231898465R57).
 
 ### Step 2: Add prefetch information into metadata.
 
