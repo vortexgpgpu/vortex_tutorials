@@ -32,7 +32,9 @@ How to register: [MICRO54 register link](https://whova.com/portal/registration/m
 |12:30 - 12:40 | Conclusions & Discussions |  Hyesoon Kim |  | 
 |12:40 - 1:00 |  Help for tutorial  | | | | 
 
-## [Tutorial video links] (https://www.youtube.com/watch?v=h1xDQILSZnI&ab_channel=MICROSymposium) 
+## Tutorial video links 
+[link] (https://www.youtube.com/watch?v=h1xDQILSZnI&ab_channel=MICROSymposium) 
+
 ## Tutorial Assignments 
 
 * [assignment1](Exercises/assignment1.md) and [assignment2](Exercises/assignment2.md): adding simple hardware performance counters. 
