@@ -1,21 +1,21 @@
 # Assignment #1
 
 In this assignment, you will be adding a new machine performance monitoring counter to calculate the average number of active threads per cycle during a program kernel execution.
-There are already a few performance counters supported in the hardware. You can see the list in [/vortex/hw/rtl/VX_config.vh](https://github.com/vortexgpgpu/vortex/blob/73d249fc56a003239fecc85783d0c49f3d3113b4/hw/rtl/VX_config.vh#L146).
+There are already a few performance counters supported in the hardware. You can see the list in [/vortex/hw/rtl/VX_config.vh](https://github.com/vortexgpgpu/vortex/blob/master/hw/rtl/VX_config.vh#L150).
 Start by adding the following lines in VX_config.vh under the comment "Machine Performance-monitoring counters" to reserve a couple of addresses in the CSR for a new active thread counter:
 
     `define CSR_MPM_ACTIVE_THREADS      12'hB1E	// active threads
     `define CSR_MPM_ACTIVE_THREADS_H    12'hB9E
-To add this new counter to the CSR, you also need to add a couple of lines to [/vortex/hw/rtl/VX_csr_data.sv](https://github.com/vortexgpgpu/vortex/blob/73d249fc56a003239fecc85783d0c49f3d3113b4/hw/rtl/VX_csr_data.sv#L129) under the macro "`ifdef PERF_ENABLE":
+To add this new counter to the CSR, you also need to add a couple of lines to [/vortex/hw/rtl/VX_csr_data.sv](https://github.com/vortexgpgpu/vortex/blob/master/hw/rtl/VX_csr_data.sv#L150) under the macro "`ifdef PERF_ENABLE":
 
 	`CSR_MPM_ACTIVE_THREADS     : read_data_r = perf_pipeline_if.active_threads[31:0];
 	`CSR_MPM_ACTIVE_THREADS_H   : read_data_r = 32'(perf_pipeline_if.active_threads[`PERF_CTR_BITS-1:32]);
 	    
-Next, you will add the counter to the [/vortex/hw/rtl/interfaces/VX_perf_pipeline_if.sv](https://github.com/vortexgpgpu/vortex/blob/73d249fc56a003239fecc85783d0c49f3d3113b4/hw/rtl/interfaces/VX_perf_pipeline_if.sv#L7) interface so it can easily be used in other VX files:
+Next, you will add the counter to the [/vortex/hw/rtl/interfaces/VX_perf_pipeline_if.sv](https://github.com/vortexgpgpu/vortex/blob/master/hw/rtl/interfaces/VX_perf_pipeline_if.sv#L10) interface so it can easily be used in other VX files:
 
     wire [`PERF_CTR_BITS-1:0]     active_threads;
 
-You should also add this new "active_threads" counter as an output and input in the [master](https://github.com/vortexgpgpu/vortex/blob/73d249fc56a003239fecc85783d0c49f3d3113b4/hw/rtl/interfaces/VX_perf_pipeline_if.sv#L18) and [slave](https://github.com/vortexgpgpu/vortex/blob/73d249fc56a003239fecc85783d0c49f3d3113b4/hw/rtl/interfaces/VX_perf_pipeline_if.sv#L30) modports respectively in this same interface.
+You should also add this new "active_threads" counter as an output and input in the [issue](https://github.com/vortexgpgpu/vortex/blob/master/hw/rtl/interfaces/VX_perf_pipeline_if.sv#L27) and [slave](https://github.com/vortexgpgpu/vortex/blob/master/hw/rtl/interfaces/VX_perf_pipeline_if.sv#L39) modports respectively in this same interface.
 
 You will be using the “CSR_MPM_ACTIVE_THREADS” and “CSR_MPM_ACTIVE_THREADS_H” counter slots to store your computed data. An easy place to calculate the current number of active threads is to use the instruction active thread mask "ibuffer_if.tmask" in the issue stage located at /vortex/hw/rtl/VX_issue.sv. An instruction is issued when both "ibuffer_if.valid" and "ibuffer_if.ready" are asserted. When an instruction is issued, you will count the total active bits in "ibuffer_if.tmask" to obtain the count for that cycle. In VX_issue.sv, start by defining a register for the new counter directly under the ["`ifdef PERF_ENABLE" macro](https://github.com/vortexgpgpu/vortex/blob/73d249fc56a003239fecc85783d0c49f3d3113b4/hw/rtl/VX_issue.sv#L147):
 
@@ -31,7 +31,7 @@ Once this is done, the number of active threads should be divided by the total n
 
     uint64_t active_threads = 0;
 
-Then, in [the next "#ifdef PERF_ENABLE" macro](https://github.com/vortexgpgpu/vortex/blob/73d249fc56a003239fecc85783d0c49f3d3113b4/driver/common/vx_utils.cpp#L156) in the same "vx_dump_perf" function, you should add the code to retrieve the counter from the CSR:
+Then, in [the next "#ifdef PERF_ENABLE" macro](https://github.com/vortexgpgpu/vortex/blob/master/driver/common/vx_utils.cpp#L172) in the same "vx_dump_perf" function, you should add the code to retrieve the counter from the CSR:
 
     uint64_t active_threads_per_core = get_csr_64(staging_ptr, CSR_MPM_ACTIVE_THREADS);
     if (num_cores > 1) fprintf(stream, "PERF: core%d: active threads=%ld\n", core_id, active_threads_per_core);

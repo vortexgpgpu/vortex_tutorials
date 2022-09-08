@@ -8,7 +8,7 @@ Tasks: compile code debug flag and check (1) prefetch requests are generated cor
 ```
 $ ./ci/blackbox.sh --driver=rtlsim --app=demo --debug
 ```
-A debug trace run.log is generated in the current directory during the program execution. The trace includes important states of the simulated processor (memory, caches, pipeline, stalls, etc..). A waveform trace trace.vcd is also generated in the current directory during the program execution. You can visualize the waveform trace using any tool that can open VCD files (Modelsim, Quartus, Vivado, etc..). [GTKwave] (http://gtkwave.sourceforge.net) is a great open-source scope analyzer that also works with VCD files: (https://github.com/vortexgpgpu/vortex/blob/staging/doc/debugging.md) 
+A debug trace run.log is generated in the current directory during the program execution. The trace includes important states of the simulated processor (memory, caches, pipeline, stalls, etc..). A waveform trace trace.vcd is also generated in the current directory during the program execution. You can visualize the waveform trace using any tool that can open VCD files (Modelsim, Quartus, Vivado, etc..). [GTKwave] (http://gtkwave.sourceforge.net) is a great open-source scope analyzer that also works with VCD files: (https://github.com/vortexgpgpu/vortex/blob/master/docs/debugging.md)
  
 Example of what information run.log provides/what we should look for:
 
