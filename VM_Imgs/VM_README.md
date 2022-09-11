@@ -15,18 +15,21 @@ works as expected. Success would depend on whether all the required packages can
 in the underlying Docker container. [Here](https://app.vagrantup.com/jeffnoxon/boxes/ubuntu-20.04-arm64) 
 is one possible Vagrant setup that could be investigated if you are interested.
 
-For this tutorial, we recommend using the remote server rather than the local VM if you only have local
-access to an M1 device.
-
 
 ## VM Usage Instructions
 
-**First** you will need to install [Vagrant](https://www.vagrantup.com) and [VirtualBox](). We have tested
+**First** you will need to install [Vagrant](https://www.vagrantup.com) and [VirtualBox](https://www.virtualbox.com). We have tested
 on Linux and Windows 10 with Vagrant 2.2.18 and VirtualBox 6.1.26.
+
+For Linux (Ubuntu/Debian) users, Vagrant and VirtualBox can be installed using the following:
+
+```
+apt install vagrant virtualbox
+```
 
 ### Vagrant set up and initialization
 
-* [Vagrant Box with prebuilt toolchains and Vortex repo (1.5 GB)](https://gatech.app.box.com/s/6rdnn96glytc87sfehq8dnmd82e4q44y)
+* [Vagrant Box with prebuilt toolchains and Vortex repo (1.5 GB)](https://gatech.box.com/s/t36lnpzpvhn1ixvqlr8kj33btkt1q0us)
 * [Vagrantfile - place in the same folder as your .box file](Vagrantfile)
 
 #### Tutorial Setup - All Platforms
@@ -35,21 +38,31 @@ Once you have booted your VM from the instructions below, you should follow thes
 * Source the `set_vortex_env.sh` script to set your paths
 * Proceed to the Exercises section of this repo.
 
-#### Windows Setup
+#### Setup
 
-1) Download the Vortex Vagrant Box image ([from Box]()) and the updated Vagrantfile ([from this repo](Vagrantfile)) to your computer
-    * Note that the VM box image is **1.5 GB**, and it requires **4 GB of local disk space**.
-    * The VagrantFile includes some tweaks to disable serial adapters which can cause a boot error.
-    * If you need to increase/decrease the number of cores used by the VM, you can also make this change in the Vagrantfile. 
+1) Download the Vortex Vagrant Box image ([from Box](https://gatech.box.com/s/t36lnpzpvhn1ixvqlr8kj33btkt1q0us)) to your computer
+    * Create a directory to contain the files we need for Vagrant and move the vortex-ubuntu.box file there.
+    * Note that the VM box image is **2.5 GiB**, and it requires **5 GiB of local disk space**.
 
-2) Import the Vagrant Box image using the command-line and start the VM
+2) Import the Vagrant Box image using the command-line
+    * Run the commands from the directory created in step 1)
 
 ```
-# We create a new local VM image from the vortex-ubuntu18 .box file and 
+# We create a new local VM image from the vortex-ubuntu.box file and 
 # then initialize a Vagrantfile with `vagrant init`
 
-vagrant box add vortex-micro vortex-ubuntu18
-vagrant init vortex-micro
+vagrant box add vortex-ubuntu.box --name vortex-micro55
+vagrant init vortex-micro55
+```
+
+3) Download the Vagrantfile ([from this repo](Vagrantfile)) to your computer
+    * Replace the Vagrantfile generated in the previous step.
+    * The VagrantFile includes some tweaks to disable serial adapters which can cause a boot error.
+    * If you need to increase/decrease the number of cores used by the VM, you can also make this change in the Vagrantfile.
+    * Create a directory named `vagrant-shared` in the same location for shared folder functionality. This folder will sync after ssh with the folder ~vagrant/vagrant-shared in the VM.
+
+4) Boot the VM
+```
 vagrant up
 ```
 
@@ -71,24 +84,3 @@ Note that you can see and log into the VM using the VirtualBox Manager GUI. Just
 Vagrant, if possible.
 
 ![VirtualBox Example Win10](screenshots/windows/vagrant_tutorial_windows10_4.png)
-
-#### Linux Setup (Ubuntu 18)
-
-Install Vagrant and Virtualbox using either the downloads above or by using apt.
-
-```
-apt install vagrant virtualbox
-```
-
-Then you will follow the same steps as above for the Windows setup.
-
-2) Import the Vagrant Box image using the command-line and start the VM
-
-```
-# We create a new local VM image from the vortex-ubuntu18 .box file and 
-# then initialize a Vagrantfile with `vagrant init`
-
-vagrant box add vortex-micro vortex-ubuntu18
-vagrant init vortex-micro
-vagrant up
-```
