@@ -29,7 +29,7 @@ apt install vagrant virtualbox
 
 ### Vagrant set up and initialization
 
-* [Vagrant Box with prebuilt toolchains and Vortex repo (1.5 GB)](https://gatech.box.com/s/t36lnpzpvhn1ixvqlr8kj33btkt1q0us)
+* [Vagrant Box with prebuilt toolchains and Vortex repo (2.5 GiB)](https://gatech.box.com/s/t36lnpzpvhn1ixvqlr8kj33btkt1q0us)
 * [Vagrantfile - place in the same folder as your .box file](Vagrantfile)
 
 #### Tutorial Setup - All Platforms
@@ -57,7 +57,7 @@ vagrant init vortex-micro55
 
 3) Download the Vagrantfile ([from this repo](Vagrantfile)) to your computer
     * Replace the Vagrantfile generated in the previous step.
-    * The VagrantFile includes some tweaks to disable serial adapters which can cause a boot error.
+    * The Vagrantfile includes some tweaks to disable serial adapters which can cause a boot error.
     * If you need to increase/decrease the number of cores used by the VM, you can also make this change in the Vagrantfile.
     * Create a directory named `vagrant-shared` in the same location for shared folder functionality. This folder will sync after ssh with the folder ~vagrant/vagrant-shared in the VM.
 
