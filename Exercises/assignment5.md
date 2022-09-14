@@ -1,3 +1,6 @@
+This assignment is already implemented in the current version of Vortex. If you would like to work on a version that does not already contain prefetch logic, checkout commit `456f1df`. A Vagrant VM with this version is located [here](https://gatech.box.com/s/lsdd65kecxk5v57znzyn66s355l54zvt) and instructions to set up this VM are located [here](https://github.com/vortexgpgpu/vortex_tutorials/blob/a79b5573be1307f7373d6e1fb040a4df0a871c3/VM_Imgs/VM_README.md).
+
+
 # Assignment #5: How to add a new instruction 
 
 In this assignment, you will learn how to add a new instruction by using intrinsics and extending the pipeline. You will add a software prefetch instruction. You will first add the new instruction to Sim-X, a functional simulator of Vortex, before implementing it in the pipeline using RTL programming. Since software prefetch is an instruction that is not currently supported by the RISC-V toolchain, you will first have to insert the new instruction using assembly code. 

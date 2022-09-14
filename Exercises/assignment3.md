@@ -16,7 +16,7 @@ The processor generates memory addresses and inserts the new memory address into
 The VX pipe register takes the input and outputs it in the next cycle. The output of the `VX_pipe_register` is then fed to the index buffer and sent to the cache. This makes sure the output changes only at clock edges. 
  
 ![](../figs/assignment3_fig2.png)
-  
+
 ![](../figs/assignment3_fig3.png)
 
 The `stall_in` signal acts as an enable for the pipe register. `stall_in` checks that there is a valid request and that we are ready(the cache is not busy) to push that request into the pipe register. When both these conditions are met, we enable input into the pipe register. 
@@ -24,9 +24,8 @@ The `stall_in` signal acts as an enable for the pipe register. `stall_in` checks
 *Hints*:
 
 - Which structure holds memory requests? `VX_pipe_register` and `VX_index_buffer`.
-- Which files do the student need to change? *VX_lsu_unit.v*.
-- How to handle the responds from prefetch requests? Just ignore it.
+- Which files need to be changed? [VX_lsu_unit.sv](https://github.com/vortexgpgpu/vortex/blob/master/hw/rtl/VX_lsu_unit.sv).
+- How to handle the response from prefetch requests? Just ignore it.
 
-
-
-
+**Note:**
+Logic to enable software prefetching [(Assignment 5)](https://github.com/vortexgpgpu/vortex_tutorials/blob/main/Exercises/assignment5.md) is already implemented in the current version of Vortex. If you would like to work on a version that does not already contain prefetch logic, checkout commit `456f1df`. A Vagrant VM with this version is located [here](https://gatech.box.com/s/lsdd65kecxk5v57znzyn66s355l54zvt) and instructions to set up this VM are located [here](https://github.com/vortexgpgpu/vortex_tutorials/blob/a79b5573be1307f7373d6e1fb040a4df0a8671c3/VM_Imgs/VM_README.md).
