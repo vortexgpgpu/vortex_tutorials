@@ -80,7 +80,7 @@ due to the additional setup steps that Vagrant performs.
 
 ![Successful Exit Win10](screenshots/windows/vagrant_tutorial_windows10_3.png)
 
-Note that you can see and log into the VM using the VirtualBox Manager GUI. Just remember to start/stop the image with
+Note that you can see and log into the VM using the VirtualBox Manager GUI with username and password: `vagrant`. Just remember to start/stop the image with
 Vagrant, if possible.
 
 ![VirtualBox Example Win10](screenshots/windows/vagrant_tutorial_windows10_4.png)
