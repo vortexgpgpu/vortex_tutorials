@@ -32,7 +32,7 @@ How to register: [MICRO-55 register link](https://whova.com/portal/registration/
 * [Assignment 6](Exercises/assignment5.md): adding performance counters to test the software prefetcher
 
 ### Solutions
-Solutions are available for (assignment 3)[https://github.com/vortexgpgpu/vortex_tutorials/blob/main/Solutions/assignment3_solution.md] and (assignment 5)[https://github.com/vortexgpgpu/vortex_tutorials/blob/main/Solutions/assignment5_solution.md].
+Solutions are available for [assignment 3](https://github.com/vortexgpgpu/vortex_tutorials/blob/main/Solutions/assignment3_solution.md) and [assignment 5](https://github.com/vortexgpgpu/vortex_tutorials/blob/main/Solutions/assignment5_solution.md).
 
 ## Mailing list
 For tutorial info please join vortex-dev@lists.gatech.edu 
@@ -48,6 +48,3 @@ VM Access (recommended): please see the [VM README](VM_Imgs/VM_README.md) to get
 
 * [Vortex](https://github.com/vortexgpgpu/vortex) 
 * [POCL](http://portablecl.org)
-
-## Previous Tutorial Video
-[link] (https://www.youtube.com/watch?v=h1xDQILSZnI&ab_channel=MICROSymposium)
