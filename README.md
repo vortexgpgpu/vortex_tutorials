@@ -4,11 +4,11 @@ Description:
 
 [Vortex](http://vortex.cc.gatech.edu/) is an [open-source](https://github.com/vortexgpgpu/) hardware and software project to support GPGPU based on RISC-V ISA extensions. Currently, Vortex supports OpenCL/CUDA and it runs on FPGA. The Vortex platform is highly customizable and scalable with a complete open-source compiler, driver and runtime software stack to enable research in GPU architectures. As an application session, we will also have how to run drone applications on FPGA.
 
-## Date: 2022-10-1 (9AM CST - 12:30PM CST)
+## Date: 2022-10-1 (8AM CST - 12:00PM CST)
 
 ## Organizers:
 
-Hyesoon Kim, Blaise Tine, Ruobing Han, Sam Jijina, Liam Cooper (Georgia Institute of Technology)
+Hyesoon Kim, Blaise Tine, Ruobing Han, Sam Jijina, Liam Cooper, Jeff Young (Georgia Institute of Technology)
 
 ## Registration
 
@@ -18,11 +18,15 @@ How to register: [MICRO-55 register link](https://whova.com/portal/registration/
 
 |  Time | Contents  |
 |---|---|
-| 9:00-10:30 | Vortex Hardware |
-| 10:30-11:00 | Vortex Software |
-| 11:00-11:30 | Vortex Hands-on sessions |
+
+| 8:00-8:30 | Intro and GPU background |
+| 8:30-9:00 | Vortex Microarchitecture |
+| 9:00-10:00 | Vortex Code Review |
+| 10:00 - 10:20 |Q&A and Break |
+| 10:20-11:00 | Vortex Software |
+| 11:00-11:10 | Vortex FPGA demo |
+| 11:10-11:30 | Tutorial assignments and assignment #1 demo |
 | 11:30-12:00 | drone applications |
-| 12:00-12:30 | Vortex FPGA demo |
 
 ## Tutorial Assignments
 
