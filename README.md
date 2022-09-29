@@ -22,8 +22,8 @@ How to register: [MICRO-55 register link](https://whova.com/portal/registration/
 | 8:30-9:00 | Vortex Microarchitecture | Blaise Tine | | 
 | 9:00-10:00 | Vortex Code Review | Blaise Tine | | 
 | 10:00 - 10:20 |Q&A and Break | ||
-| 10:20-11:00 | Vortex Software stack| Blaise Tine | | 
-| 10:20-11:00 | CupBop/ Running OpenCL/CUDA on Vortex | Roubing Han || 
+| 10:20-10:30 | Vortex Software stack| Blaise Tine | | 
+| 10:30-11:00 | CupBop/ Running OpenCL/CUDA on Vortex | Roubing Han || 
 | 11:00-11:10 | Vortex FPGA demo | Liam Cooper | | 
 | 11:10-11:30 | Tutorial assignments and discussions for academic usages with Vortex| Hyesoon Kim |
 | 11:30-12:00 | drone applications | Sam Jijina | |
