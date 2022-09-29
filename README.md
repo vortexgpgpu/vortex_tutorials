@@ -16,16 +16,18 @@ How to register: [MICRO-55 register link](https://whova.com/portal/registration/
 
 ## Tentative Tutorial Schedule
 
-|  Time | Contents  |
+|  Time | Contents  | Presenter|slides|
 |---|---|
-| 8:00-8:30 | Intro and GPU background |
-| 8:30-9:00 | Vortex Microarchitecture |
-| 9:00-10:00 | Vortex Code Review |
-| 10:00 - 10:20 |Q&A and Break |
-| 10:20-11:00 | Vortex Software |
-| 11:00-11:10 | Vortex FPGA demo |
-| 11:10-11:30 | Tutorial assignments and discussions for academic usages with Vortex|
-| 11:30-12:00 | drone applications |
+| 8:00-8:30 | Intro and GPU background | Hyesoon Kim | | 
+| 8:30-9:00 | Vortex Microarchitecture | Blaise Tine | | 
+| 9:00-10:00 | Vortex Code Review | Blaise Tine | | 
+| 10:00 - 10:20 |Q&A and Break | ||
+| 10:20-11:00 | Vortex Software stack| Blaise Tine | | 
+| 10:20-11:00 | CupBop/ Running OpenCL/CUDA on Vortex | Roubing Han || 
+
+| 11:00-11:10 | Vortex FPGA demo | Liam Cooper | | 
+| 11:10-11:30 | Tutorial assignments and discussions for academic usages with Vortex| Hyesoon Kim |
+| 11:30-12:00 | drone applications | Sam Jijina | |
 
 ## Tutorial Assignments
 
