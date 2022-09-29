@@ -17,7 +17,7 @@ How to register: [MICRO-55 register link](https://whova.com/portal/registration/
 ## Tentative Tutorial Schedule
 
 |  Time | Contents  | Presenter|slides|
-|---|---|
+|---|---|-----|---|
 | 8:00-8:30 | Intro and GPU background | Hyesoon Kim | | 
 | 8:30-9:00 | Vortex Microarchitecture | Blaise Tine | | 
 | 9:00-10:00 | Vortex Code Review | Blaise Tine | | 
