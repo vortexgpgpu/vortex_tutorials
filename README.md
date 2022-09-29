@@ -24,7 +24,7 @@ How to register: [MICRO-55 register link](https://whova.com/portal/registration/
 | 10:00 - 10:20 |Q&A and Break |
 | 10:20-11:00 | Vortex Software |
 | 11:00-11:10 | Vortex FPGA demo |
-| 11:10-11:30 | Tutorial assignments and assignment #1 demo |
+| 11:10-11:30 | Tutorial assignments and discussions for academic usages with Vortex|
 | 11:30-12:00 | drone applications |
 
 ## Tutorial Assignments
