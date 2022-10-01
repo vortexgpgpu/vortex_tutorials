@@ -1,4 +1,4 @@
-# Solution for Assignment #3:How to add a HW prefetcher
+# Solution for Assignment #3: How to add a HW prefetcher
 
 ## Download and execute the solution:
 
@@ -18,14 +18,14 @@ make
 
 ### Step 1: Insert addr+4 into `req_pipe_reg` for pre_fetch load.
 
-For background knowledge of `handsake`, please see this [link](http://fpgacpu.ca/fpga/handshake.html).
+For background knowledge of `handshake`, please see this [link](http://fpgacpu.ca/fpga/handshake.html).
 Without prefetch, a whole process of a normal load request is as following:
 
-1. VX_issue provides `full_addr` and set `valid bit` to 1. VX_issue will keep holding `full_addr` until handsake has done.
-2. VX_lsu_unit will set `ready bit` to 1 as long as it's ready to execute new instruction.
-3. At the cycle when both `valid bit` and `ready bit` are 1, handsake is done, VX_issue will move to next instructions, and VX_lsu_unit accepts the `full_addr`, store this address into `req_pipe_reg`, and executes load/store accordingly.
+1. VX_issue provides `full_addr` and set `valid bit` to 1. VX_issue will keep holding `full_addr` until handshake is done.
+2. VX_lsu_unit will set `ready bit` to 1 as long as it is ready to execute a new instruction.
+3. At the cycle when both `valid bit` and `ready bit` are 1, the handshake is done. VX_issue will move to the next instructions, and VX_lsu_unit accepts the `full_addr`. This address is stored into `req_pipe_reg`, and executes load/store accordingly.
 
-When there is a prefetch, after the handsake has done, we have to provide a new request to VX_lsu_unit for the prefetch and insert it into `req_pipe_reg`. For detailed information, please see [source code](https://github.com/vortexgpgpu/vortex/pull/22/files#diff-e7c7dffbfe7b26e92b9b1675965b8920f4acaf6c337f1a53d837738231898465R57).
+When there is a prefetch, after the handshake has done, we have to provide a new request to VX_lsu_unit for the prefetch and insert it into `req_pipe_reg`. For detailed information, please see [source code](https://github.com/vortexgpgpu/vortex/pull/22/files#diff-e7c7dffbfe7b26e92b9b1675965b8920f4acaf6c337f1a53d837738231898465R57).
 
 ### Step 2: Add prefetch information into metadata.
 
@@ -33,11 +33,11 @@ This step is necessary: we have to record whether a load request is prefetch. If
 
 ## NOTE
 
-Although the overview is clear, there are some details needed to be concerned:
+Although the overview is clear, there are some details to be concerned with:
 
 - How to solve the conflict between prefetch and the next load instruction?
   As descirbed before, normal load instruction and prefetch all want to insert a new address into `req_pipe_reg`. What if they want to insert at the same time?
-- How to drop the return value of prefetch load? For the normal load, after the `LSU` got the data from cache/memory, it stalls until the data been taken. However, for prefetch, there will never be a consumer taking the data. In this situation, there will be deadblock.
+- How to drop the return value of prefetch load? For the normal load, after the `LSU` got the data from cache/memory, it stalls until the data been taken. However, for prefetch, there will never be a consumer taking the data. In this situation, there will be a deadlock.
 
 ## Experiments
 

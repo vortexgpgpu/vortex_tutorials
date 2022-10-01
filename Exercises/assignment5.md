@@ -7,7 +7,7 @@ In this assignment, you will learn how to add a new instruction by using intrins
 
 ---
 
-## Step 1: Adding a new intrinsic: 
+## Step 1: Adding a new intrinsic
 
 You will begin by inserting the instruction in [/Vortex/runtime/include/vx_intrinsics.h](https://github.com/vortexgpgpu/vortex/blob/e2b5799a013b98f067ee8aaeda07ea3c979ef546/runtime/include/vx_intrinsics.h#L86) using assembly code.
 
@@ -21,13 +21,13 @@ You will begin by inserting the instruction in [/Vortex/runtime/include/vx_intri
 
 ---
 
-## Step 2: Defining a new instruction in simX:
+## Step 2: Defining a new instruction in simX
   
-### 2a: Decoding the new instruction:
+### 2a: Decoding the new instruction
 
 Following the pattern of how the other Vortex RISC-V instructions are implemented, decode the opcode for software prefetch in [/Vortex/sim/simX/decode.cpp](https://github.com/vortexgpgpu/vortex/blob/73d249fc56a003239fecc85783d0c49f3d3113b4/sim/simX/decode.cpp#L184).
 
-### 2b: Executing the new instruction:
+### 2b: Executing the new instruction
 
 For now, all we want to do is print the prefetch address when the instruction is executed in [/Vortex/sim/simX/execute.cpp](https://github.com/vortexgpgpu/vortex/blob/73d249fc56a003239fecc85783d0c49f3d3113b4/sim/simX/execute.cpp#L714). We are not worried about the details of the implementation yet since our goal for now is to simply understand how a new instruction is added.
   
@@ -37,14 +37,14 @@ For now, all we want to do is print the prefetch address when the instruction is
 
 ---
 
-## Step 3: Extending the pipeline:
+## Step 3: Extending the pipeline
 
 ### 3a: Adding the opcode for prefetch:
 
 As mentioned before, the opcode for Vortex RISC-V instructions is `0x6b` and is defined in [/Vortex/hw/rtl/VX_define.vh](https://github.com/vortexgpgpu/vortex/blob/e2b5799a013b98f067ee8aaeda07ea3c979ef546/hw/rtl/VX_define.vh#L67). The instruction identifier *5* for software prefetch has also been defined [here](https://github.com/vortexgpgpu/vortex/blob/e2b5799a013b98f067ee8aaeda07ea3c979ef546/hw/rtl/VX_define.vh#L188).
   
 
-### 3b: Decoding the prefetch instruction:
+### 3b: Decoding the prefetch instruction
 
 In [/Vortex/hw/rtl/VX_decode.sv](https://github.com/vortexgpgpu/vortex/blob/e2b5799a013b98f067ee8aaeda07ea3c979ef546/hw/rtl/VX_decode.sv#L377), you will need to add a case for the identifier `5`. 
 
@@ -54,7 +54,7 @@ In [/Vortex/hw/rtl/VX_decode.sv](https://github.com/vortexgpgpu/vortex/blob/e2b5
 - The immediate field which contains the address needs to be sign extended to 32 bits
 - Software prefetch is designed to mimic a load instruction while ignoring the load responce. Hence, the rd register is not used.
 
-### 3c: Adding a tag to identify a prefetch instruction:
+### 3c: Adding a tag to identify a prefetch instruction
 
 You need to add a tag to [/Vortex/hw/rtl/interfaces/VX_lsu_req_if.sv](https://github.com/vortexgpgpu/vortex/blob/73d249fc56a003239fecc85783d0c49f3d3113b4/hw/rtl/interfaces/VX_lsu_req_if.sv#L19) to distinguish a software prefetch from a load.
 
@@ -70,7 +70,7 @@ We mimic the behavior of a load my modifying the req_wb signal in [/Vortex/hw/rt
 
 ---
 
-## Step 4: Developing a test for software prefetch:
+## Step 4: Developing a test for software prefetch
 
 - A test to check the working of the fence instruction has already been developed in /Vortex/tests/regression/fence.
 
@@ -95,7 +95,7 @@ We mimic the behavior of a load my modifying the req_wb signal in [/Vortex/hw/rt
 
 ---
 
-## Step 6: Results and Debugging
+## Step 5: Results and Debugging
 
 ### SimX
 
@@ -106,6 +106,6 @@ We mimic the behavior of a load my modifying the req_wb signal in [/Vortex/hw/rt
 ### RTL
 
 ``` bash
-./ci/blackbox.sh --driver=rtlsim --cores=4 --app=prefetch   --debug
+./ci/blackbox.sh --driver=rtlsim --cores=4 --app=prefetch --debug
 ```   
 ---
