@@ -18,15 +18,15 @@ How to register: [MICRO-55 register link](https://whova.com/portal/registration/
 
 |  Time | Contents  | Presenter|slides|
 |---|---|-----|---|
-| 8:00-8:30 | Intro and GPU background | Hyesoon Kim | | 
-| 8:30-9:00 | Vortex Microarchitecture | Blaise Tine | | 
-| 9:00-10:00 | Vortex Code Review | Blaise Tine | | 
-| 10:00 - 10:20 |Q&A and Break | ||
-| 10:20-10:30 | Vortex Software stack| Blaise Tine | | 
-| 10:30-11:00 | CupBop/ Running OpenCL/CUDA on Vortex | Roubing Han || 
-| 11:00-11:10 | Vortex FPGA demo | Liam Cooper | | 
-| 11:10-11:30 | Tutorial assignments and discussions for academic usages with Vortex| Hyesoon Kim |
-| 11:30-12:00 | drone applications | Sam Jijina | |
+| 8:00-8:30 | Intro and GPU background | Hyesoon Kim | [slides0](Slides_MICRO55/0.tutorial_introduction.pptx) [slides1](Slides_MICRO55/1.gpu_arch.pptx) | 
+| 8:30-9:00 | Vortex Microarchitecture | Blaise Tine | [slides2](Slides_MICRO55/2.vortex_microarchitecture.pptx) | 
+| 9:00-10:00 | Vortex Code Review | Blaise Tine | [slides3](Slides_MICRO55/3.code_structure.pptx) | 
+| 10:00-10:20 | Q&A and Break | ||
+| 10:20-10:30 | Vortex Software stack| Blaise Tine | [slides4](Slides_MICRO55/4.vortex_software_stack.pptx) | 
+| 10:30-11:00 | CupBop/Running OpenCL/CUDA on Vortex | Roubing Han | [slides5](Slides_MICRO55/5.CuPBoP_introduction.pptx) | 
+| 11:00-11:10 | Vortex FPGA demo | Liam Cooper | [demo video](Slides_MICRO54/vortex_fpga_demo.mp4) | 
+| 11:10-11:30 | Tutorial assignments and discussions for academic usages with Vortex | Hyesoon Kim | [slides6](Slides_MICRO55/6.vortex_hands_on.pptx) |
+| 11:30-12:00 | drone applications | Sam Jijina | [slides7](Slides_MICRO55/7.micro_2022_drone_tutorial.pptx) |
 
 ## Tutorial Assignments
 
