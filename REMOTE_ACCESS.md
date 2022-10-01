@@ -2,6 +2,9 @@
 
 We suggest that you use the Open OnDemand terminal interface hosted by the CRNCH Rogues Gallery if you are not able to download and use the local VM Image. 
 
+### Selecting a username
+Please use the [spreadsheet here](https://bit.ly/3LB5HRA) to reserve a username to use for the duration of the tutorial. The organizers will share a password with you for your particular username.  
+
 ### OOD Terminal Login
 
 1) Log into [rg-ood.crnch.gatech.edu](https://rg-ood.crnch.gatech.edu) with your GT username and password. For a tutorial, this will be provided to you along with a temporary password.
@@ -9,30 +12,38 @@ We suggest that you use the Open OnDemand terminal interface hosted by the CRNCH
 
 <div style="text-align: center;">
     
-![RG OOD login](figs/vortex_tutorial_login.PNG "RG OOD Login")
+![RG OOD login](https://github.com/gt-crnch-rg/vortex_tutorials/blob/e5d2e761b635bdaa372ae5f17cc0c7adce6fb536/figs/vortex_tutorial_login.PNG "RG OOD Login")
 
 </div>
 
-![RG OOD Portal](figs/vortex_tutorial.PNG "OOD Vortex Portal")
+![RG OOD Portal](https://github.com/gt-crnch-rg/vortex_tutorials/blob/e5d2e761b635bdaa372ae5f17cc0c7adce6fb536/figs/vortex_tutorial.PNG "OOD Vortex Portal")
 
 2) Check the fields (we recommend using 2 vCPUs) and hit “Launch” to start a terminal job. 
 
-![Vortex Job](figs/vortex_tutorial_2.PNG "OOD Vortex Job")
+![Vortex Job](https://github.com/gt-crnch-rg/vortex_tutorials/blob/e5d2e761b635bdaa372ae5f17cc0c7adce6fb536/figs/vortex_tutorial_2.PNG "OOD Vortex Job")
 
 3) Wait about 30 seconds to one minute for the job to be launched on the server. When it switches to “Running”, you should be able to click `Connect` to open a remote terminal on the server.
 
-![Vortex Running](figs/vortex_tutorial_3.PNG "OOD Vortex Running")
+![Vortex Running](https://github.com/gt-crnch-rg/vortex_tutorials/blob/e5d2e761b635bdaa372ae5f17cc0c7adce6fb536/figs/vortex_tutorial_3.PNG "OOD Vortex Running")
 
 4) This new window will have a [tmux instance](https://www.ocf.berkeley.edu/~ckuehl/tmux/). Note that the escape for this particular instance is `Ctrl+A` so to create a new window you would use `Ctrl+A` and then `c`.
 
-![Vortex Tmux](figs/vortex_tutorial_4.PNG "OOD Vortex Tmux")
+![Vortex Tmux](https://github.com/gt-crnch-rg/vortex_tutorials/blob/e5d2e761b635bdaa372ae5f17cc0c7adce6fb536/figs/vortex_tutorial_4.PNG "OOD Vortex Tmux")
 
-5) Vortex is now ready to be used
-
-6) When you are done you can close the web window and your scheduled job will terminate automatically. Alternatively, you can go back to your `My Interactive Sessions` tab in the Open OnDemand portal and hit `Delete` to cancel your scheduled session. Hit `Confirm` to delete the currently running job.
+5. When you are done you can close the web window and your scheduled job will terminate automatically. Alternatively, you can go back to your `My Interactive Sessions` tab in the Open OnDemand portal and hit `Delete` to cancel your scheduled session. Hit `Confirm` to delete the currently running job.
     * Note that your session will stay running for the length of the specified job (usually 1 hour by default).
 
-![Vortex Delete](figs/vortex_tutorial_delete.PNG "OOD Vortex Delete")
+![Vortex Delete](https://github.com/gt-crnch-rg/vortex_tutorials/blob/e5d2e761b635bdaa372ae5f17cc0c7adce6fb536/figs/vortex_tutorial_delete.PNG "OOD Vortex Delete")
+
+### Tutorial and Environment Setup
+
+Once you log in, your environment should already be set up. However, if you need to reinitialize your environment you can run the environment setup script.
+
+```
+$ . micro-tutorial-2022/set_vortex_env.sh
+```
+
+The tutorial repo is located under `~/micro-tutorial-2022/vortex_tutorials`. 
 
 
 ### Troubleshooting
