@@ -27,7 +27,11 @@ We suggest that you use the Open OnDemand terminal interface hosted by the CRNCH
 
 ![Vortex Tmux](figs/vortex_tutorial_4.PNG "OOD Vortex Tmux")
 
-5. When you are done you can close the web window and your scheduled job will terminate automatically. Alternatively, you can go back to your `My Interactive Sessions` tab in the Open OnDemand portal and hit `Delete` to cancel your scheduled session. Hit `Confirm` to delete the currently running job.
+5) Run the following command:
+`source /netscratch/tutorials/micro-tutorial-2022/set_vortex_env.sh`
+Vortex is now ready to be used.
+
+6) When you are done you can close the web window and your scheduled job will terminate automatically. Alternatively, you can go back to your `My Interactive Sessions` tab in the Open OnDemand portal and hit `Delete` to cancel your scheduled session. Hit `Confirm` to delete the currently running job.
     * Note that your session will stay running for the length of the specified job (usually 1 hour by default).
 
 ![Vortex Delete](figs/vortex_tutorial_delete.PNG "OOD Vortex Delete")
