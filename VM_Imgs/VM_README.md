@@ -29,7 +29,7 @@ apt install vagrant virtualbox
 
 ### Vagrant set up and initialization
 
-* [Vagrant Box with prebuilt toolchains and Vortex repo (2.5 GiB)](https://gatech.box.com/s/t36lnpzpvhn1ixvqlr8kj33btkt1q0us)
+* [Vagrant Box with prebuilt toolchains and Vortex repo (2.5 GiB)](https://gatech.box.com/s/bq38b25icvg712bssgk3pq39bcr3s5eo)
 * [Vagrantfile - place in the same folder as your .box file](Vagrantfile)
 
 #### Tutorial Setup - All Platforms
@@ -40,7 +40,7 @@ Once you have booted your VM from the instructions below, you should follow thes
 
 #### Setup
 
-1) Download the Vortex Vagrant Box image ([from Box](https://gatech.box.com/s/t36lnpzpvhn1ixvqlr8kj33btkt1q0us)) to your computer
+1) Download the Vortex Vagrant Box image ([from Box](https://gatech.box.com/s/bq38b25icvg712bssgk3pq39bcr3s5eo)) to your computer
     * Create a directory to contain the files we need for Vagrant and move the vortex-ubuntu.box file there.
     * Note that the VM box image is **2.5 GiB**, and it requires **5 GiB of local disk space**.
 
