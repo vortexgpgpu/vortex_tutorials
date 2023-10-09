@@ -8,8 +8,9 @@ We also provide the base Vagrantfile we use, although we note that setup may req
 See "Building Vortex from Scratch" for more details on setting up a new VM and/or a base installation of the
 tools.
 
-### Important note for Apple Macbook M1 users
-VirtualBox is not supported on M1 laptops and systems due to the switch from an x86 to aarch64 processor.
+### Important note for Apple Macbook M1/M2 users
+VirtualBox is currently in beta for M1/M2 laptops and systems due to the switch from an x86 to aarch64 processor.
+The beta is unstable but is available [here](https://www.virtualbox.org/wiki/Testbuilds) (macOS/ARM64 BETA).
 You can technically use a Vagrantfile with Docker, but we haven't tested this and can't confirm that it
 works as expected. Success would depend on whether all the required packages can be installed for aarch64 
 in the underlying Docker container. [Here](https://app.vagrantup.com/jeffnoxon/boxes/ubuntu-20.04-arm64) 
