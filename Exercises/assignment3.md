@@ -24,7 +24,7 @@ The `stall_in` signal acts as an enable for the pipe register. `stall_in` checks
 *Hints*:
 
 - Which structure holds memory requests? `VX_pipe_register` and `VX_index_buffer`.
-- Which files need to be changed? [VX_lsu_unit.sv](https://github.com/vortexgpgpu/vortex/blob/master/hw/rtl/VX_lsu_unit.sv).
+- Which files need to be changed? [VX_lsu_unit.sv](https://github.com/vortexgpgpu/vortex/blob/master/hw/rtl/core/VX_lsu_unit.sv).
 - How to handle the response from prefetch requests? Just ignore it.
 
 **Note:**
