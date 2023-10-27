@@ -48,7 +48,7 @@ VM Access (recommended): please see the [VM README](VM_Imgs/VM_README.md) to get
 If you are not able to download and use the VM, the alternative is to use the Open OnDemand terminal interface hosted by the [CRNCH Rogues Gallery](https://crnch.gatech.edu/). Instructions coming soon.
 
 ## System Set Up Instructions
-If you would like to set up Vortex on your own system instead of using a VM or remote access, instructions can be found [here](https://github.com/vortexgpgpu/vortex/blob/master/README.md) and pre-built toolchain details [here](https://github.com/vortexgpgpu/vortex/blob/master/docs/execute_opencl_on_vortex.md); they are for Linux (Ubuntu 18.04) systems only.
+If you would like to set up Vortex on your own system instead of using a VM or remote access, instructions can be found [here](https://github.com/vortexgpgpu/vortex/blob/master/README.md) and pre-built toolchain details [here](https://github.com/vortexgpgpu/vortex-toolchain-prebuilt); they are for Linux (Ubuntu 18.04) systems only.
 
 ## Relevant Repos
 
