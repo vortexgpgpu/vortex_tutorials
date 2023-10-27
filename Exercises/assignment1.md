@@ -42,7 +42,7 @@ Finally, at the bottom of this same file, you can divide the total number of act
 
 To test your change, you will be calling the software demo using the --perf command line argument from the Vortex directory: 
 
-    ./ci/blackbox.sh --cores=4 --app=demo --perf=active_threads_per_core 
+    ./ci/blackbox.sh --cores=4 --app=demo --perf= 
 
 The console output should show all the counters, including a line similar to the following line that reports your average active threads per cycle.
 
@@ -50,10 +50,10 @@ The console output should show all the counters, including a line similar to the
 
 You can change the program workload to the following values 16, 32, 64, 128: 
 
-    ./ci/blackbox.sh --cores=4 --app=demo --perf=active_threads_per_core --args=”-n16” 
-    ./ci/blackbox.sh --cores=4 --app=demo --perf=active_threads_per_core --args=”-n32” 
-    ./ci/blackbox.sh --cores=4 --app=demo --perf=active_threads_per_core --args=”-n64” 
-    ./ci/blackbox.sh --cores=4 --app=demo --perf=active_threads_per_core --args=”-n128” 
+    ./ci/blackbox.sh --cores=4 --app=demo --perf= --args=”-n16” 
+    ./ci/blackbox.sh --cores=4 --app=demo --perf= --args=”-n32” 
+    ./ci/blackbox.sh --cores=4 --app=demo --perf= --args=”-n64” 
+    ./ci/blackbox.sh --cores=4 --app=demo --perf= --args=”-n128” 
 
 
 Vortex Source Code Location: 
