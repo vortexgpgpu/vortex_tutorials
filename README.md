@@ -21,11 +21,11 @@ How to register: [MICRO-56 registration link](https://microarch.org/micro56/atte
 | 1:00-1:30 | Intro and GPU background                                             | Hyesoon Kim    |        |
 | 1:30-2:00 | Vortex Microarchitecture                                             | Blaise Tine    |        |
 | 2:00-3:00 | Vortex Code Review                                                   | Blaise Tine    |        |
-| 3:00-3:20 | Q&A and Break                                                        |                |        |
-| 3:20-3:30 | Vortex Software Stack                                                | Mark Ahn       |        |
-| 3:30-4:00 | CupBop/Running OpenCL/CUDA on Vortex                                 | Shinnung Jeong |        |
-| 4:00-4:10 | Vortex FPGA demo                                                     | Liam Cooper    |        |
-| 4:10-4:30 | Tutorial Assignments and Discussions for Academic Usages with Vortex | Hyesoon Kim    |        |
+| 3:00-3:30 | Q&A and Break                                                        |                |        |
+| 3:30-3:50 | Vortex Software Stack                                                | Shinnung Jeong     |        |
+| 3:50-4:10 | CupBop/Running OpenCL/CUDA on Vortex                                 | Chihyo Ahn |        |
+| 4:10-4:20 | Vortex FPGA demo   & Tutorial Assignments                            | Liam Cooper    |        |
+| 4:20-4:40 | T Discussions for Academic Usages with Vortex | Hyesoon Kim    |        |
 | 4:30-5:00 | Hands-on Exercises                                                   |                |        |
 
 ## Tutorial Assignments
@@ -45,7 +45,7 @@ For tutorial info please join vortex-dev@lists.gatech.edu
 VM Access (recommended): please see the [VM README](VM_Imgs/VM_README.md) to get instructions for downloading and running the Vortex tools using Vagrant and VirtualBox.
 
 ## Remote Access
-If you are not able to download and use the VM, the alternative is to use the Open OnDemand terminal interface hosted by the [CRNCH Rogues Gallery](https://crnch.gatech.edu/). Instructions coming soon.
+If you are not able to download and use the VM, the alternative is to use the Open OnDemand terminal interface hosted by the [CRNCH Rogues Gallery](https://crnch.gatech.edu/). Instructions are coming soon.
 
 ## System Set Up Instructions
 If you would like to set up Vortex on your own system instead of using a VM or remote access, instructions can be found [here](https://github.com/vortexgpgpu/vortex/blob/master/README.md) and pre-built toolchain details [here](https://github.com/vortexgpgpu/vortex-toolchain-prebuilt); they are for Linux (Ubuntu 18.04) systems only.
