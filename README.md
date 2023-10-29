@@ -19,7 +19,7 @@ How to register: [MICRO-56 registration link](https://microarch.org/micro56/atte
 | Time      | Contents                                    | Presenter      | slides |
 |-----------|---------------------------------------------|----------------|--------|
 | 1:00-1:30 | Intro and GPU background                    | Hyesoon Kim    | [slides 1](Slides_MICRO56/0.tutorial_introduction.pptx) [slides 2](Slides_MICRO56/1.gpu_arch.pptx)        |
-| 1:30-2:00 | Vortex Microarchitecture                    | Blaise Tine    | [slides](Slides_MICRO56/1.gpu_arch.pptx)       |
+| 1:30-2:00 | Vortex Microarchitecture                    | Blaise Tine    | [slides](Slides_MICRO56/2.vortex_microarchitecture.pptx)       |
 | 2:00-3:00 | Vortex Code Review                          | Blaise Tine    | [slides](Slides_MICRO56/3.code_structure.pptx)       |
 | 3:00-3:30 | Q&A and Break                               |                |        |
 | 3:30-3:50 | Vortex Software Stack                       | Shinnung Jeong | [slides](Slides_MICRO56/vortex_software_stack.pptx)       |
