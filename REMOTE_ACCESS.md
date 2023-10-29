@@ -29,6 +29,7 @@ After logging into rg-login noded, run:
     export LD_LIBRARY_PATH=${GNU_RISCV_ROOT}:$LD_LIBRARY_PATH
 
 ### Build Vortex
+    cd vortex
     make -s
 
 ### Quick demo running vecadd OpenCL kernel on 2 cores
