@@ -16,17 +16,17 @@ How to register: [MICRO-56 registration link](https://microarch.org/micro56/atte
 
 ## Tentative Tutorial Schedule
 
-| Time      | Contents                                                             | Presenter      | slides |
-|-----------|----------------------------------------------------------------------|----------------|--------|
-| 1:00-1:30 | Intro and GPU background                                             | Hyesoon Kim    |        |
-| 1:30-2:00 | Vortex Microarchitecture                                             | Blaise Tine    |        |
-| 2:00-3:00 | Vortex Code Review                                                   | Blaise Tine    |        |
-| 3:00-3:30 | Q&A and Break                                                        |                |        |
-| 3:30-3:50 | Vortex Software Stack                                                | Shinnung Jeong     |        |
-| 3:50-4:10 | CupBop/Running OpenCL/CUDA on Vortex                                 | Chihyo Ahn |        |
-| 4:10-4:20 | Vortex FPGA demo   & Tutorial Assignments                            | Liam Cooper    |        |
-| 4:20-4:40 | Discussions for Academic Usages with Vortex | Hyesoon Kim    |        |
-| 4:30-5:00 | Hands-on Exercises                                                   |                |        |
+| Time      | Contents                                    | Presenter      | slides |
+|-----------|---------------------------------------------|----------------|--------|
+| 1:00-1:30 | Intro and GPU background                    | Hyesoon Kim    | [slides 1](Slides_MICRO56/0.tutorial_introduction.pptx) [slides 2](Slides_MICRO56/1.gpu_arch.pptx)        |
+| 1:30-2:00 | Vortex Microarchitecture                    | Blaise Tine    | [slides](Slides_MICRO56/1.gpu_arch.pptx)       |
+| 2:00-3:00 | Vortex Code Review                          | Blaise Tine    | [slides](Slides_MICRO56/3.code_structure.pptx)       |
+| 3:00-3:30 | Q&A and Break                               |                |        |
+| 3:30-3:50 | Vortex Software Stack                       | Shinnung Jeong | [slides](Slides_MICRO56/vortex_software_stack.pptx)       |
+| 3:50-4:10 | CupBop/Running OpenCL/CUDA on Vortex        | Chihyo Ahn     | [slides](Slides_MICRO56/cupbop.pptx)       |
+| 4:10-4:20 | Vortex FPGA demo   & Tutorial Assignments   | Liam Cooper    | [slides](Slides_MICRO56/fpga_and_assignments.pptx)       |
+| 4:20-4:40 | Discussions for Academic Usages with Vortex | Hyesoon Kim    | [slides](Slides_MICRO56/7.tutorial_discussions.pptx)       |
+| 4:30-5:00 | Hands-on Exercises                          |                |        |
 
 ## Tutorial Assignments
 
