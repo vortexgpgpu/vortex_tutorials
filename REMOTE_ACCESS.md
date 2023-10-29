@@ -1,11 +1,11 @@
-## Vortex Tutorial - Remote Option
+# Vortex Tutorial - Remote Option
 
 We suggest that you use the Open OnDemand terminal interface hosted by the CRNCH Rogues Gallery if you are not able to download and use the local VM Image. 
 
-### Selecting a username
+## Selecting a username
 Please use the [spreadsheet here](https://docs.google.com/spreadsheets/d/1ISum4aZnXu5L_aYllZsVUR3lIca7MH6kc9qXQHgfWWE/edit#gid=0) to reserve a username to use for the duration of the tutorial. The organizers will share a password with you for your particular username.
 
-### OOD Terminal Login
+## OOD Terminal Login
 
 1) Log into [rg-ood.crnch.gatech.edu](https://rg-ood.crnch.gatech.edu) with your GT username and password. For a tutorial, this will be provided to you along with a temporary password.
     - Select the `Vortex Tutorial` option under the `Reconfig` tab.
@@ -35,18 +35,36 @@ Please use the [spreadsheet here](https://docs.google.com/spreadsheets/d/1ISum4a
 
 ![Vortex Delete](https://github.com/gt-crnch-rg/vortex_tutorials/blob/e5d2e761b635bdaa372ae5f17cc0c7adce6fb536/figs/vortex_tutorial_delete.PNG "OOD Vortex Delete")
 
-### Tutorial and Environment Setup
+## Vortex Setup
 
-Once you log in, your environment should already be set up. However, if you need to reinitialize your environment you can run the environment setup script.
+### Install Vortex codebase
+    $ git clone --recursive https://github.com/vortexgpgpu/vortex.git
+    $ cd vortex
+	
+### Install prebuilt toolchain
+    $ mkdir vortex-toolchain
+    $ export DESTDIR=~/vortex-toolchain
+    $ ./ci/toolchain_install.sh --all
 
-```
-$ . micro-tutorial-2022/set_vortex_env.sh
-```
+### Set up environment
+    $ export VORTEX_HOME=~/vortex
+    $ export LLVM_VORTEX=$DESTDIR/llvm-vortex
+    $ export LLVM_POCL=$DESTDIR/llvm-pocl
+    $ export RISCV_TOOLCHAIN_PATH=$DESTDIR/riscv-gnu-toolchain
+    $ export GNU_RISCV_ROOT=${RISCV_TOOLCHAIN_PATH}
+    $ export VERILATOR_ROOT=$DESTDIR/verilator
+    $ export POCL_CC_PATH=$DESTDIR/pocl/compiler
+    $ export POCL_RT_PATH=$DESTDIR/pocl/runtime
+    $ export PATH=${VERILATOR_ROOT}/bin:${GNU_RISCV_ROOT}/bin/:$PATH
+    $ export LD_LIBRARY_PATH=${GNU_RISCV_ROOT}:$LD_LIBRARY_PATH
 
-The tutorial repo is located under `~/micro-tutorial-2022/vortex_tutorials`. 
+### Build Vortex
+    $ make -s
 
+### Quick demo running vecadd OpenCL kernel on 2 cores
+    $ ./ci/blackbox.sh --cores=2 --app=vecadd
 
-### Troubleshooting
+## Troubleshooting
 
 1) When launching a new job, the job may fail to launch with an I/O error.
     * `Failed to submit session with the following error: sbatch: error: Batch job submission failed: I/O error writing script/environment to file.`
