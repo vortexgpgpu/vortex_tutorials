@@ -37,13 +37,13 @@ Please use the [spreadsheet here](https://docs.google.com/spreadsheets/d/1ISum4a
 
 ## Vortex Setup
 
-### Install Vortex codebase
+### Download Vortex codebase
     $ git clone --recursive https://github.com/vortexgpgpu/vortex.git
-    $ cd vortex
 	
 ### Install prebuilt toolchain
     $ mkdir vortex-toolchain
     $ export DESTDIR=~/vortex-toolchain
+    $ cd vortex
     $ ./ci/toolchain_install.sh --all
 
 ### Set up environment
