@@ -25,7 +25,7 @@ How to register: [MICRO-56 registration link](https://microarch.org/micro56/atte
 | 3:30-3:50 | Vortex Software Stack                                                | Shinnung Jeong     |        |
 | 3:50-4:10 | CupBop/Running OpenCL/CUDA on Vortex                                 | Chihyo Ahn |        |
 | 4:10-4:20 | Vortex FPGA demo   & Tutorial Assignments                            | Liam Cooper    |        |
-| 4:20-4:40 | T Discussions for Academic Usages with Vortex | Hyesoon Kim    |        |
+| 4:20-4:40 | Discussions for Academic Usages with Vortex | Hyesoon Kim    |        |
 | 4:30-5:00 | Hands-on Exercises                                                   |                |        |
 
 ## Tutorial Assignments

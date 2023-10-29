@@ -19,8 +19,8 @@ is one possible Vagrant setup that could be investigated if you are interested.
 
 ## VM Usage Instructions
 
-**First** you will need to install [Vagrant](https://www.vagrantup.com) and [VirtualBox](https://www.virtualbox.com). We have tested
-on Linux and Windows 10 with Vagrant 2.2.18 and VirtualBox 6.1.26.
+**First** you will need to install [Vagrant](https://www.vagrantup.com) and [VirtualBox](https://www.virtualbox.org). We have tested
+on Linux and Windows 10 with Vagrant 2.2.18 and VirtualBox 7.
 
 For Linux (Ubuntu/Debian) users, Vagrant and VirtualBox can be installed using the following:
 
@@ -43,7 +43,7 @@ Once you have booted your VM from the instructions below, you should follow thes
 
 1) Download the Vortex Vagrant Box image ([from Box](https://gatech.box.com/v/vortex-ubuntu-box)) to your computer
     * Create a directory to contain the files we need for Vagrant and move the vortex-ubuntu.box file there.
-    * Note that the VM box image is **2.5 GiB**, and it requires **5 GiB of local disk space**.
+    * Note that the VM box image is **3 GiB**, and it requires **5 GiB of local disk space**.
 
 2) Import the Vagrant Box image using the command-line
     * Run the commands from the directory created in step 1)
@@ -53,7 +53,7 @@ Once you have booted your VM from the instructions below, you should follow thes
 # then initialize a Vagrantfile with `vagrant init`
 
 vagrant box add vortex-ubuntu.box --name vortex-micro55
-vagrant init vortex-micro55
+vagrant init vortex-micro56
 ```
 
 3) Download the Vagrantfile ([from this repo](Vagrantfile)) to your computer

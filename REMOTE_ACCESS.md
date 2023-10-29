@@ -3,7 +3,7 @@
 We suggest that you use the Open OnDemand terminal interface hosted by the CRNCH Rogues Gallery if you are not able to download and use the local VM Image. 
 
 ### Selecting a username
-Please use the [spreadsheet here](https://bit.ly/3LB5HRA) to reserve a username to use for the duration of the tutorial. The organizers will share a password with you for your particular username.  
+Please use the [spreadsheet here](https://docs.google.com/spreadsheets/d/1ISum4aZnXu5L_aYllZsVUR3lIca7MH6kc9qXQHgfWWE/edit#gid=0) to reserve a username to use for the duration of the tutorial. The organizers will share a password with you for your particular username.
 
 ### OOD Terminal Login
 
@@ -11,7 +11,7 @@ Please use the [spreadsheet here](https://bit.ly/3LB5HRA) to reserve a username 
     - Select the `Vortex Tutorial` option under the `Reconfig` tab.
 
 <div style="text-align: center;">
-    
+
 ![RG OOD login](https://github.com/gt-crnch-rg/vortex_tutorials/blob/e5d2e761b635bdaa372ae5f17cc0c7adce6fb536/figs/vortex_tutorial_login.PNG "RG OOD Login")
 
 </div>
