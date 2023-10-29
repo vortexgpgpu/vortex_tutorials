@@ -45,7 +45,7 @@ For tutorial info please join vortex-dev@lists.gatech.edu
 VM Access (recommended): please see the [VM README](VM_Imgs/VM_README.md) to get instructions for downloading and running the Vortex tools using Vagrant and VirtualBox.
 
 ## Remote Access
-If you are not able to download and use the VM, the alternative is to use the Open OnDemand terminal interface hosted by the [CRNCH Rogues Gallery](https://crnch.gatech.edu/). Instructions are coming soon.
+If you are not able to download and use the VM, the alternative is to use the Open OnDemand terminal interface hosted by the [CRNCH](https://crnch.gatech.edu/) Rogues Gallery. [Instructions can be found here](REMOTE_ACCESS.md).
 
 ## System Set Up Instructions
 If you would like to set up Vortex on your own system instead of using a VM or remote access, instructions can be found [here](https://github.com/vortexgpgpu/vortex/blob/master/README.md) and pre-built toolchain details [here](https://github.com/vortexgpgpu/vortex-toolchain-prebuilt); they are for Linux (Ubuntu 18.04) systems only.
