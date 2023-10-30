@@ -52,7 +52,7 @@ Once you have booted your VM from the instructions below, you should follow thes
 # We create a new local VM image from the vortex-ubuntu.box file and 
 # then initialize a Vagrantfile with `vagrant init`
 
-vagrant box add vortex-ubuntu.box --name vortex-micro55
+vagrant box add vortex-ubuntu.box --name vortex-micro56
 vagrant init vortex-micro56
 ```
 
