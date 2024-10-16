@@ -1,65 +1,181 @@
-# Assignment #1
+# Assignment #1: Warp Efficiency Performance Counter
 
-In this assignment, you will be adding a new machine performance monitoring counter to calculate the average number of active threads per cycle during a program kernel execution.
-There are already a few performance counters supported in the hardware. You can see the list in [/vortex/hw/rtl/VX_Types.vh](https://github.com/vortexgpgpu/vortex/blob/master/hw/rtl/VX_types.vh#L65).
-Start by adding the following lines in VX_Types.vh under the comment "Machine Performance-monitoring counters" to reserve a couple of addresses in the CSR for a new active thread counter:
+In this assignment, you will add two new machine performance monitoring counters to track **warp efficiency** during program kernel execution. These two counters, `fire_count` and `active_thread_count`, will allow you to compute warp efficiency by dividing the number of active threads by the number of times a warp is issued.
 
-    `define CSR_MPM_ACTIVE_THREADS      12'hB1E	// active threads
-    `define CSR_MPM_ACTIVE_THREADS_H    12'hB9E
-To add this new counter to the CSR, you also need to add a couple of lines to [vortex/hw/rtl/core/VX_csr_data.sv](https://github.com/vortexgpgpu/vortex/blob/master/hw/rtl/core/VX_csr_data.sv#L185) under the macro "`ifdef PERF_ENABLE":
+Warp efficiency can be computed as:
 
-	`CSR_MPM_ACTIVE_THREADS     : read_data_r = perf_pipeline_if.active_threads[31:0];
-	`CSR_MPM_ACTIVE_THREADS_H   : read_data_r = 32'(perf_pipeline_if.active_threads[`PERF_CTR_BITS-1:32]);
-	    
-Next, you will add the counter to the [/vortex/hw/rtl/interfaces/VX_pipeline_perf_if.sv](https://github.com/vortexgpgpu/vortex/blob/master/hw/rtl/interfaces/VX_pipeline_perf_if.sv#L20) interface so it can easily be used in other VX files:
+$$
+\text{Warp Efficiency} = \frac{\text{active\_thread\_count}}{\text{fire\_count} \times \text{warp\_size}}
+$$
 
-    wire [`PERF_CTR_BITS-1:0]     active_threads;
+Vortex already supports a few performance counters, and you can find the list in the file [/vortex/hw/rtl/VX_types.vh](https://github.com/vortexgpgpu/vortex/blob/master/hw/rtl/VX_types.vh). You will be adding two new counters for `fire_count` and `active_thread_count`.
 
-You should also add this new "active_threads" counter as an output and input in the [issue](https://github.com/vortexgpgpu/vortex/blob/master/hw/rtl/interfaces/VX_pipeline_perf_if.sv#L27) and [slave](https://github.com/vortexgpgpu/vortex/blob/master/hw/rtl/interfaces/VX_pipeline_perf_if.sv#L34) modports respectively in this same interface.
+### Step 1: Reserve CSR Addresses for the New Counters
 
-You will be using the “CSR_MPM_ACTIVE_THREADS” and “CSR_MPM_ACTIVE_THREADS_H” counter slots to store your computed data. An easy place to calculate the current number of active threads is to use the instruction active thread mask "ibuffer_if.tmask" in the issue stage located at /vortex/hw/rtl/core/VX_issue.sv. An instruction is issued when both "ibuffer_if.valid" and "ibuffer_if.ready" are asserted. When an instruction is issued, you will count the total active bits in "ibuffer_if.tmask" to obtain the count for that cycle. In VX_issue.sv, start by defining a register for the new counter directly under the ["`ifdef PERF_ENABLE" macro](https://github.com/vortexgpgpu/vortex/blob/master/hw/rtl/core/VX_issue.sv#L153):
+Start by reserving addresses in the CSR for the new counters. In `VX_types.vh`, under the "Machine Performance-monitoring memory counters (class 3)" section, add the following lines:
 
-    reg [`PERF_CTR_BITS-1:0] perf_active_threads;
+```verilog
+`define VX_CSR_MPM_FIRE_COUNT            12'hB03    // fire count
+`define VX_CSR_MPM_FIRE_COUNT_H          12'hB83
+`define VX_CSR_MPM_ACTIVE_THREAD_COUNT   12'hB04    // active thread count
+`define VX_CSR_MPM_ACTIVE_THREAD_COUNT_H 12'hB84
+```
 
-In this same macro, remember to assign this register to the counter we defined earlier in the interface:
+You will also need to add the definition next to the other class definitions near the top:
 
-	assign perf_pipeline_if.active_threads = perf_active_threads;
+```verilog
+`define VX_DCR_MPM_CLASS_3              3
+```
 
-Next, the logic for counting the total number of active threads must be written in VX_issue.sv.
+### Step 2: Add the Counters to the CSR
 
-Once this is done, the number of active threads should be divided by the total number of cycles in /vortex/runtime/common/vx_utils.cpp and printed out. You can start by adding this counter in the function "vx_dump_perf" under [the first "#ifdef PERF_ENABLE" macro](https://github.com/vortexgpgpu/vortex/blob/master/runtime/common/utils.cpp#L181):
+Next, you need to add logic to expose these counters in the CSR. In [VX_csr_data.sv](https://github.com/vortexgpgpu/vortex/blob/master/hw/rtl/core/VX_csr_data.sv#L276), add the new case for the new class of performance counters, along with the logic to read and expose them:
 
-    uint64_t active_threads = 0;
+```verilog
+`VX_DCR_MPM_CLASS_3: begin
+    case (read_addr)
+    // Add your custom counters here for Class 3:
+    `CSR_READ_64(`VX_CSR_MPM_FIRE_COUNT, read_data_ro_w, pipeline_perf_if.sched.fire_count);
+    `CSR_READ_64(`VX_CSR_MPM_ACTIVE_THREAD_COUNT, read_data_ro_w, pipeline_perf_if.sched.active_thread_count);
+    default:;
+    endcase
+end
+```
 
-Then, in [the next "#ifdef PERF_ENABLE" macro](https://github.com/vortexgpgpu/vortex/blob/master/driver/common/vx_utils.cpp#L254) in the same "vx_dump_perf" function, you should add the code to retrieve the counter from the CSR:
+### Step 3: Update the Performance Interface in VX_gpu_pkg.sv
 
-    uint64_t active_threads_per_core = get_csr_64(staging_buff.data(), CSR_MPM_ACTIVE_THREADS);
-    if (num_cores > 1) fprintf(stream, "PERF: core%d: active threads=%ld\n", core_id, active_threads_per_core);
-    active_threads += active_threads_per_core;
+Modify the performance structure `sched_perf_t` in [VX_gpu_pkg.sv](https://github.com/vortexgpgpu/vortex/blob/master/hw/rtl/VX_gpu_pkg.sv) to include the new counters:
 
-    
-Finally, at the bottom of this same file, you can divide the total number of active threads by the cycle count and print out the active threads per cycle.
+```verilog
+typedef struct packed {
+    logic [`PERF_CTR_BITS-1:0] idles;
+    logic [`PERF_CTR_BITS-1:0] stalls;
+    logic [`PERF_CTR_BITS-1:0] fire_count;
+    logic [`PERF_CTR_BITS-1:0] active_thread_count;
+} sched_perf_t;
+```
 
-To test your change, you will be calling the software demo using the --perf command line argument from the Vortex directory: 
+### Step 4: Implement Logic for Fire Count and Active Thread Count
 
-    ./ci/blackbox.sh --cores=4 --app=demo --perf=1
+You will now implement the logic for tracking `fire_count` and `active_thread_count` in the `VX_schedule.sv` file.
 
-The console output should show all the counters, including a line similar to the following line that reports your average active threads per cycle.
+#### In `VX_schedule.sv`, add the following registers under the bottom `ifdef PERF_ENABLE`:
 
-    PERF: average active threads per cycle=??? 
+```verilog
+reg [`PERF_CTR_BITS-1:0] perf_fire_count;
+reg [`PERF_CTR_BITS-1:0] perf_active_thread_count;
+```
 
-You can change the program workload to the following values 16, 32, 64, 128: 
+#### In the `always @(posedge clk)` block (inside the same `ifdef PERF_ENABLE`), first add the logic to reset our counter when reset signal is asserted:
 
-    ./ci/blackbox.sh --cores=4 --app=demo --perf=1 --args=”-n16"
-    ./ci/blackbox.sh --cores=4 --app=demo --perf=1 --args=”-n32"
-    ./ci/blackbox.sh --cores=4 --app=demo --perf=1 --args=”-n64”
-    ./ci/blackbox.sh --cores=4 --app=demo --perf=1 --args=”-n128”
+```verilog
+perf_fire_count <= 0;
+perf_active_thread_count <= 0;
+```
+
+#### Also add the logic to increment these counters when a warp is fired in the else block (`schedule_if_fire`):
+
+```verilog
+if (schedule_if_fire) begin
+    perf_fire_count <= perf_fire_count + 1;
+    perf_active_thread_count <= perf_active_thread_count + $countones(schedule_if.data.tmask);
+end
+```
+
+#### Assign these values to the performance interface after the `always @(posedge clk)` block:
+
+```verilog
+assign sched_perf.fire_count = perf_fire_count;
+assign sched_perf.active_thread_count = perf_active_thread_count;
+```
+
+### Step 5: Expose the Counters in the Runtime
+
+In the `vx_dump_perf` function in [`vortex/runtime/stub/vx_utils.cpp`](https://github.com/vortexgpgpu/vortex/blob/master/runtime/stub/vx_utils.cpp#L216), retrieve the values for `fire_count` and `active_thread_count` and use them to calculate warp efficiency.
+
+#### In `vx_utils.cpp`, add the following code to fetch the values from the CSR and calculate warp efficiency:
+
+#### At the end of the other counter declarations in `vx_dump_perf`, add:
+```cpp
+// PERF: CLASS_3
+uint64_t fire_count = 0;
+uint64_t active_thread_count = 0;
+```
+
+#### Then, add a new case for VX_DCR_MPM_CLASS_3 in [`vortex/runtime/stub/vx_utils.cpp`](https://github.com/vortexgpgpu/vortex/blob/master/runtime/stub/vx_utils.cpp#L550):
+```cpp
+    case VX_DCR_MPM_CLASS_3:
+    {
+      uint64_t threads_per_warp;
+      CHECK_ERR(vx_dev_caps(hdevice, VX_CAPS_NUM_THREADS, &threads_per_warp), {
+        return err;
+      });
+      // Retrieve fire_count and active_thread_count for each core
+
+      // Query fire_count for the core
+      uint64_t fire_count_per_core;
+      CHECK_ERR(vx_mpm_query(hdevice, VX_CSR_MPM_FIRE_COUNT, core_id, &fire_count_per_core), {
+        return err;
+      });
+
+      // Query active_thread_count for the core
+      uint64_t active_thread_count_per_core;
+      CHECK_ERR(vx_mpm_query(hdevice, VX_CSR_MPM_ACTIVE_THREAD_COUNT, core_id, &active_thread_count_per_core), {
+        return err;
+      });
+
+      // Print the fire count and active thread count
+      if (num_cores > 1)
+      {
+        fprintf(stream, "PERF: core%d: fire_count=%ld, active_thread_count=%ld\n", core_id, fire_count_per_core, active_thread_count_per_core);
+      }
+
+      // Accumulate totals for all cores
+      fire_count += fire_count_per_core;
+      active_thread_count += active_thread_count_per_core;
+    }
+    break;
+```
+
+and add the new case in the printing section also in [`vortex/runtime/stub/vx_utils.cpp`](https://github.com/vortexgpgpu/vortex/blob/master/runtime/stub/vx_utils.cpp#L630):
+```cpp
+case VX_DCR_MPM_CLASS_3: {
+    uint64_t threads_per_warp;
+    CHECK_ERR(vx_dev_caps(hdevice, VX_CAPS_NUM_THREADS, &threads_per_warp), {
+      return err;
+    });
+    // Calculate and print warp efficiency
+    double warp_efficiency = 0.0;
+    if (fire_count > 0)
+    {
+      warp_efficiency = (double)active_thread_count / (fire_count * threads_per_warp);
+    }
+    fprintf(stream, "PERF: fire_count=%ld, active_thread_count=%ld, Warp Efficiency=%f\n", fire_count, active_thread_count, warp_efficiency);
+  }
+```
+
+In this code, `vx_mpm_query` retrieves the counters from the hardware, and then warp efficiency is calculated by dividing `active_thread_count` by the product of `fire_count` and `threads_per_warp`. The results are printed to the output stream for performance analysis.
 
 
-Vortex Source Code Location: 
-https://github.com/vortexgpgpu/vortex
 
-# What to submit
-[1] PERF: average number of active threads per cycle for 16, 32, 64, 128 cases.
+### Step 6: Testing
 
-[2] Screenshots that show your code changes. Alternatively, you can put your github link. 
+To test your changes, you can run the software demo using the `--perf=3` command line argument. This will display your new `fire_count` and `active_thread_count` counters. Be sure to run `../configure` after making changes to the vortex source in order for the changes to be reflected in the `build` directory.
+
+```bash
+./ci/blackbox.sh --cores=4 --app=demo --driver=rtlsim --perf=3
+```
+
+You can run the demo with different program workloads to observe how fire count and active thread count behave under various conditions:
+
+```bash
+./ci/blackbox.sh --cores=4 --app=demo --perf=3 --driver=rtlsim --args="-n16"
+./ci/blackbox.sh --cores=4 --app=demo --perf=3 --driver=rtlsim --args="-n32"
+./ci/blackbox.sh --cores=4 --app=demo --perf=3 --driver=rtlsim --args="-n64"
+./ci/blackbox.sh --cores=4 --app=demo --perf=3 --driver=rtlsim --args="-n128"
+```
+
+### Submission
+
+[1] Console output showing fire count, active thread count, and warp efficiency for 16, 32, 64, and 128 cases.  
+[2] Screenshots that show your code changes, or alternatively, a GitHub link.
