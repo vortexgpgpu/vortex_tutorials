@@ -9,11 +9,17 @@ Description:
 ## Organizers:
 
 Hyesoon Kim (Georgia Institute of Technology)
+
 Blaise Tine (University of California, Los Angeles)
+
 Jeff Young (Georgia Institute of Technology)
+
 Jaewon Lee (Georgia Institute of Technology)
+
 Seonjin Na (Georgia Institute of Technology)
+
 Liam Cooper (Georgia Institute of Technology)
+
 Chihyo (Mark) Ahn (Georgia Institute of Technology)
 
 ## Tentative Tutorial Schedule
