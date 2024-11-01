@@ -1,45 +1,31 @@
-# Assignment #4: How to Debug
+# Assignment #3: How to add a HW prefetcher
 
-In this assignment, we will learn how to debug for a hardware prefetching implementation. 
+In this assignment, you will add a next line prefetcher in the memory system.
 
-Tasks: compile Vortex using the debug flag and check (1) the prefetch requests are generated correctly (2) the prefetch requests are indeed used or not by comparing them with demand requests. 
- 
-// Running demo program using rtlsim in debug mode
-```
-$ ./ci/blackbox.sh --driver=rtlsim --app=demo --debug=1
-```
-A debug trace run.log is generated in the current directory during the program execution. The trace includes important states of the simulated processor (memory, caches, pipeline, stalls, etc..). A waveform trace trace.vcd is also generated in the current directory during the program execution. You can visualize the waveform trace using any tool that can open VCD files (Modelsim, Quartus, Vivado, etc..). [GTKwave](http://gtkwave.sourceforge.net) is a great open-source scope analyzer that also works with VCD files.
-Additional debugging information can be found [here](https://github.com/vortexgpgpu/vortex/blob/master/docs/debugging.md).
- 
+![](../figs/assignment3_fig1.png)
 
-Example of what information run.log provides/what we should look for:
+* The `LSU` unit takes a vector of addresses. It also includes status bits like read and valid bit for each of the threads. The `LSU` unit starts with an adder that adds the offset to each of the base addresses and computes the address of load/store.
 
-## Step 1: Run demo
-```bash
-./ci/blackbox.sh --driver=rtlsim --app=demo --cores=1  --args="-n100" --debug=1
-```
-## Step 2: 
-Open the file `run.log`, and search for load requests.
-We can find a following prefetch load request with each original load request. 
+[comment]: <> (Please note that the addresses are computed for even inactive threads. For an inactive thread, the valid bit is false. The offset is an immediate value. Since the address is in the critical path, the processor sends the computed address into a pipeline latch.)
 
-For example:
-```
-        2757: D$0 Rd Req: wid=0, PC=80000544, tmask=0001, addr={0xfffffb30, 0xfffffb30, 0xfffffb30, 0x80001b30}, tag=100000a880, byteen=ffff, rd=14, is_dup=1
-        ...
-        2759: D$0 Rd Req: wid=0, PC=80000544, tmask=0001, addr={0xfffffb34, 0xfffffb34, 0xfffffb34, 0x80001b34}, tag=100000a881, byteen=ffff, rd=14, is_dup=1
+[comment]: <> (The metadata associated with the instruction has to be stored somewhere so that we can track the requests sent to the dcache and the responses and data sent from the dcache. For this purpose, the processor has an index buffer. For every instruction, the processor puts the metadata in the index buffer and gets a tag. The tag is sent as a part of the D-cache request and will be present in its D-cache response as well. When a response arrives, the processor retrieves the metadata from the index buffer using the tag and pipelines the responses with the instruction metadata to the commit stage )
+Prefetch address: every time a load address is computed, the prefetcher generates the next cache line address shown in Figure 4 and sends it to the d-cache.
 
+The processor generates memory addresses and inserts the new memory address into
+`VX_pipe_register`. Since `VX_pipe_register` takes only one memory request at a time, we need to insert a mux to choose between demand memory request and prefetch request.
+The VX pipe register takes the input and outputs it in the next cycle. The output of the `VX_pipe_register` is then fed to the index buffer and sent to the cache. This makes sure the output changes only at clock edges.
 
-        3789: D$0 Rd Req: wid=0, PC=80000454, tmask=0001, addr={0xfefff404, 0xfefff804, 0xfefffc04, 0xfefffff4}, tag=1000008a83, byteen=ffff, rd=9, is_dup=1
-        ...
-        3791: D$0 Rd Req: wid=0, PC=80000454, tmask=0001, addr={0xfefff408, 0xfefff808, 0xfefffc08, 0xfefffff8}, tag=1000008a81, byteen=ffff, rd=9, is_dup=1
-```
-From the `addr`, we can see the prefetch request load exactly original addr+4.
+![](../figs/assignment3_fig2.png)
 
+![](../figs/assignment3_fig3.png)
 
- 
-Modify the $write print statements to include aditional information.
+The `stall_in` signal acts as an enable for the pipe register. `stall_in` checks that there is a valid request and that we are ready(the cache is not busy) to push that request into the pipe register. When both these conditions are met, we enable input into the pipe register.
 
-Modify debug statements to indicate “is_pref” in $write statement in VX_lsu_unit.sv. 
+*Hints*:
 
-Add a tag in the response to indicate the cache hit or miss and print out the information.
- 
+- Which structure holds memory requests? `VX_pipe_register` and `VX_index_buffer`.
+- Which files need to be changed? [VX_lsu_unit.sv](https://github.com/vortexgpgpu/vortex/blob/master/hw/rtl/core/VX_lsu_unit.sv).
+- How to handle the response from prefetch requests? Just ignore it.
+
+**Note:**
+Logic to enable software prefetching ([Assignment 5](https://github.com/vortexgpgpu/vortex_tutorials/blob/main/Exercises/assignment5.md)) is already implemented in the current version of Vortex. If you would like to work on a version that does not already contain prefetch logic, checkout commit `456f1df`. A Vagrant VM with this version is located [here](https://gatech.box.com/v/vortex-assignment5) and instructions to set up this VM are located [here](https://github.com/vortexgpgpu/vortex_tutorials/blob/a79b5573be1307f7373d6e1fb040a4df0a8671c3/VM_Imgs/VM_README.md).
