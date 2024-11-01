@@ -1,4 +1,4 @@
-# Assignment #1: Warp Efficiency Performance Counter (RTL)
+# Assignment #2: Warp Efficiency Performance Counter (RTL)
 
 In this assignment, you will add two new machine performance monitoring (MPM) counters to the GPU hardware to calculate the GPU **Warp Efficiency** after a kernel execution. These two counters, `total_issued_warps` and `total_active_threads`, will allow you to compute warp efficiency by dividing the number of active threads by the number of times a warp was issued for execution in the GPU pipeline.
 

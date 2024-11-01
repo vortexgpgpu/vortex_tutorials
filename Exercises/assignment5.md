@@ -1,4 +1,4 @@
-# Assignment #1: Dot Product Acceleration (SimX)
+# Assignment #5: Dot Product Acceleration (SimX)
 
 This assignment will introduce you to the basics of extending GPU Microarchitecture to accelerate a kernel in hardware
 You will add a new RISC-V custom instruction for computing the integer dot product: VX\_DOT8.
