@@ -1,31 +1,64 @@
-# Assignment #3: How to add a HW prefetcher
+# Assignment #4: GPU Software Prefetching (RTL)
 
-In this assignment, you will add a next line prefetcher in the memory system.
+This assignment is an extension of assignments #1 and #5. It is divided into two parts.
+The first part involves extending the tag in the cache to include a prefetch bit.
+The second involves adding three performance counters to measure the following metrics:
+1. Number of unique prefetch requests to main memory
+2. Number of unused prefetched blocks
+3. Number of late prefetches
 
-![](../figs/assignment3_fig1.png)
+All of these counters should be implemented in `VX_cache_bank.sv`.
 
-* The `LSU` unit takes a vector of addresses. It also includes status bits like read and valid bit for each of the threads. The `LSU` unit starts with an adder that adds the offset to each of the base addresses and computes the address of load/store.
+---
 
-[comment]: <> (Please note that the addresses are computed for even inactive threads. For an inactive thread, the valid bit is false. The offset is an immediate value. Since the address is in the critical path, the processor sends the computed address into a pipeline latch.)
+## Part 1: Extending the cache tag
 
-[comment]: <> (The metadata associated with the instruction has to be stored somewhere so that we can track the requests sent to the dcache and the responses and data sent from the dcache. For this purpose, the processor has an index buffer. For every instruction, the processor puts the metadata in the index buffer and gets a tag. The tag is sent as a part of the D-cache request and will be present in its D-cache response as well. When a response arrives, the processor retrieves the metadata from the index buffer using the tag and pipelines the responses with the instruction metadata to the commit stage )
-Prefetch address: every time a load address is computed, the prefetcher generates the next cache line address shown in Figure 4 and sends it to the d-cache.
+You will need to extend the metadata tag in the bank to incorporate an additional prefetch bit. Keep in mind that the metadata tag is not the same as the line tag.
 
-The processor generates memory addresses and inserts the new memory address into
-`VX_pipe_register`. Since `VX_pipe_register` takes only one memory request at a time, we need to insert a mux to choose between demand memory request and prefetch request.
-The VX pipe register takes the input and outputs it in the next cycle. The output of the `VX_pipe_register` is then fed to the index buffer and sent to the cache. This makes sure the output changes only at clock edges.
+### Hints
 
-![](../figs/assignment3_fig2.png)
+- The last two bits of `core_req_tag` are truncated before reaching `VX_cache_bank.sv`. Keep this in mind while adding the prefetch bit to the tag in the `VX_lsu_unit.sv`.
+- To verify that your implementation is correct, add the prefetch bit to the debug header in `VX_cache_bank.sv`.
 
-![](../figs/assignment3_fig3.png)
+---
 
-The `stall_in` signal acts as an enable for the pipe register. `stall_in` checks that there is a valid request and that we are ready(the cache is not busy) to push that request into the pipe register. When both these conditions are met, we enable input into the pipe register.
+## Part 2:
 
-*Hints*:
+### 2a: Counter for the number of unique prefetch requests to memory
 
-- Which structure holds memory requests? `VX_pipe_register` and `VX_index_buffer`.
-- Which files need to be changed? [VX_lsu_unit.sv](https://github.com/vortexgpgpu/vortex/blob/master/hw/rtl/core/VX_lsu_unit.sv).
-- How to handle the response from prefetch requests? Just ignore it.
+The prefetch kernel that you used for Assignment 5 generates multiple prefetch requests to the same address. A unique prefetch request is the first request generated for that address that misses in the cache and goes to main memory. Any subsequent prefetch requests to the same address result in a cache hit.
 
-**Note:**
-Logic to enable software prefetching ([Assignment 5](https://github.com/vortexgpgpu/vortex_tutorials/blob/main/Exercises/assignment5.md)) is already implemented in the current version of Vortex. If you would like to work on a version that does not already contain prefetch logic, checkout commit `456f1df`. A Vagrant VM with this version is located [here](https://gatech.box.com/v/vortex-assignment5) and instructions to set up this VM are located [here](https://github.com/vortexgpgpu/vortex_tutorials/blob/a79b5573be1307f7373d6e1fb040a4df0a8671c3/VM_Imgs/VM_README.md).
+### Hints
+- Use the `mreq_push` signal in `VX_cache_bank.sv`.
+
+---
+
+### 2b: Counter for the number of unused prefetched blocks
+
+- In part 1 of this assignment, you added a prefetch bit to the `core_req_tag` to indicate whether an ***instruction was a software prefetch***. Now, you need to add this bit to the tag store in VX_tag_access.sv to indicate whether a ***block has been brought in by a prefetch request***.
+- You need to add a new data structure in stage 1 of the cache pipeline (the same stage as the data access) to store information about whether a cache block has been used or not. Look at `VX_Cache_tags.sv` for an idea of how this can be done. This information is universal and is applicable for every cache block.
+- The first point comes into picture since you want to know whether a ***prefetched block*** has been used or not.
+- An important point to note is that we know whether a block has been used/unused only during a ***fill operation*** since that is when the block is evicted from the cache.
+
+---
+
+### 2c: Counter for the number of late prefetches
+
+- A late prefetch is when there is a prefetch request for a particular address pending in the MSHR, and a there is a demand request for the same address.
+- You want to know whether an instruction in the MSHR is a prefetch instruction, you will need to add a data structure in the MSHR to hold the prefetch bit.
+
+### Hints
+- Look at how `addr_table` is implemented to get an idea of how to add a prefetch table.
+- Look at how `addr_matches` is implemented to get an idea of how to implement the late prefetch counter.
+
+---
+
+## Verifying Your Results:
+
+You can verify your results by running:
+
+``` bash
+./ci/blackbox.sh --driver=rtlsim --cores=1 --app=prefetch --perf=1
+```
+\# of unused prefetched blocks = 2 \
+\# of late prefetches = 1

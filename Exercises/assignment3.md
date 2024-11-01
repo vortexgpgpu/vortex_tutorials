@@ -1,6 +1,8 @@
-# Assignment #6: Adding Performance Counters to Test Vortex's Software Prefetcher
+# Assignment #3: GPU Software Prefetching (SimX)
 
-This assignment is an extension of assignments #1 and #5. It is divided into two parts. The first part involves extending the tag in the cache to include a prefetch bit. The second involves adding three performance counters to measure the following metrics:
+This assignment is an extension of assignments #1 and #5. It is divided into two parts.
+The first part involves extending the tag in the cache to include a prefetch bit.
+The second involves adding three performance counters to measure the following metrics:
 1. Number of unique prefetch requests to main memory
 2. Number of unused prefetched blocks
 3. Number of late prefetches
