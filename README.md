@@ -43,11 +43,12 @@ Comming soon
 
 ## Getting Vortex
 
-### VM Images
-Comming soon
-
-### Remote Access
+### Remote Access (Recommended)
 If you are not able to download and use the VM, the alternative is to use the Open OnDemand terminal interface hosted by the [CRNCH](https://crnch.gatech.edu/) Rogues Gallery. Instructions coming soon.
+
+### Docker (Experimental)
+See the [Docker instructions](./docker/README.md) for how to set up a Docker image for Vortex.
+
 
 ### System Set Up Instructions
 If you would like to set up Vortex on your own system, instructions can be found [here](https://github.com/vortexgpgpu/vortex/blob/master/docs/install_vortex.md).
