@@ -36,10 +36,15 @@ Chihyo (Mark) Ahn (Georgia Institute of Technology)
 
 ## Tutorial Assignments
 
-We plan to have eight hands-on tutorial assignments covering various aspects of Vortex. Comming soon.
+Provided are eight hands-on tutorial assignments covering various aspects of Vortex:
 
-### Solutions
-Comming soon
+[Assignment 1](Exercises/assignment1.md) and [Assignment 2](Exercises/assignment2.md) add a warp efficiency performance counter in Vortex's cycle-level simulator and RTL respectively.
+
+[Assignment 3](Exercises/assignment3.md) and [Assignment 4](Exercises/assignment4.md) add software prefetching to the cycle-level simulator and RTL respectively.
+
+[Assignment 5](Exercises/assignment5.md) and [Assignment 6](Exercises/assignment6.md) add a new custom RISC-V instruction for computing the integer dot product in the cycle-level simulator and RTL respectively.
+
+[Assignment 7](Exercises/assignment7.md) teaches how to debug Vortex.
 
 ## Getting Vortex
 

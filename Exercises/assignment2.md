@@ -4,9 +4,9 @@ In this assignment, you will add two new machine performance monitoring (MPM) co
 
 The Warp Efficiency can be computed as:
 
-$$
+```math
 \text{Warp Efficiency} = \frac{\text{total\_active\_threads}}{\text{total\_issued\_warps} \times \text{warp\_size}} \times 100
-$$
+```
 
 Vortex already supports a few performance counters, and you can find the list in the file [/vortex/hw/rtl/VX_types.vh](https://github.com/vortexgpgpu/vortex/blob/master/hw/rtl/VX_types.vh). You will be adding two new counters for `total_issued_warps` and `total_active_threads`.
 

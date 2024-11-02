@@ -1,6 +1,6 @@
 # Assignment #3: GPU Software Prefetching (SimX)
 
-This assignment is an extension of assignments #1 and #5. It is divided into two parts.
+This assignment is divided into two parts.
 The first part involves extending the tag in the cache to include a prefetch bit.
 The second involves adding three performance counters to measure the following metrics:
 1. Number of unique prefetch requests to main memory
