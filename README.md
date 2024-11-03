@@ -14,6 +14,8 @@ Blaise Tine (University of California, Los Angeles)
 
 Jeff Young (Georgia Institute of Technology)
 
+Aaron Jezghani (Georgia Institute of Technology)
+
 Jaewon Lee (Georgia Institute of Technology)
 
 Seonjin Na (Georgia Institute of Technology)
@@ -36,7 +38,7 @@ Chihyo (Mark) Ahn (Georgia Institute of Technology)
 
 ## Tutorial Assignments
 
-Provided are eight hands-on tutorial assignments covering various aspects of Vortex:
+Provided are seven hands-on tutorial assignments covering various aspects of Vortex:
 
 [Assignment 1](Exercises/assignment1.md) and [Assignment 2](Exercises/assignment2.md) add a warp efficiency performance counter in Vortex's cycle-level simulator and RTL respectively.
 
@@ -48,15 +50,15 @@ Provided are eight hands-on tutorial assignments covering various aspects of Vor
 
 ## Getting Vortex
 
-### Remote Access (Recommended)
-If you are not able to download and use the VM, the alternative is to use the Open OnDemand terminal interface hosted by the [CRNCH](https://crnch.gatech.edu/) Rogues Gallery. Instructions coming soon.
+### Remote Access
+A terminal interface hosted by the [CRNCH Rogues Gallery](https://crnch-rg.cc.gatech.edu/) is provided. [Instructions can be found here](./REMOTE_ACCESS.md).
 
 ### Docker (Experimental)
 See the [Docker instructions](./docker/README.md) for how to set up a Docker image for Vortex.
 
 
 ### System Set Up Instructions
-If you would like to set up Vortex on your own system, instructions can be found [here](https://github.com/vortexgpgpu/vortex/blob/master/docs/install_vortex.md).
+If you would like to set up Vortex on your own system, [instructions can be found here](https://github.com/vortexgpgpu/vortex/blob/master/docs/install_vortex.md).
 
 ## Relevant Repos
 

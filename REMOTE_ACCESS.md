@@ -1,36 +1,21 @@
 # Vortex Tutorial - Remote Option
 
-We suggest that you use ssh into a machine hosted by the CRNCH Rogues Gallery if you are not able to download and use the local VM Image. This option will be available until the end of the conference (November 1st)
+We suggest that you use a remote server hosted by the [CRNCH Rogues Gallery](https://crnch-rg.cc.gatech.edu/). This option will be available until the end of the conference (November 6th)
 
-## Selecting a username
-Please use the [spreadsheet here](https://docs.google.com/spreadsheets/d/1ISum4aZnXu5L_aYllZsVUR3lIca7MH6kc9qXQHgfWWE/edit#gid=0) to reserve a username to use for the duration of the tutorial. The organizers will share a password with you for your particular username.
+## Register for access
+Please use the [form to submit your Github ID](https://forms.office.com/r/SXUDPwuDuk) to reserve a slot to use for the duration of the tutorial.
 
-## Terminal Login
-    ssh <username>@rg-login.crnch.gatech.edu
-	
-After logging into rg-login noded, run:
+## Login
+Login to `rg-simulation.crnch.gatech.edu/jupyter` using your Github account.
 
-    ssh flubber1
+Then, click "launch my server".
 
-## Vortex Setup
+Once there, open the terminal application and run `cd /vortex/build`.
 
-### Download Vortex codebase
-    git clone --recursive https://github.com/vortexgpgpu/vortex.git
+## Build Vortex
+From the `build` directory, set up the environment with `source ./ci/toolchain_env.sh`.
 
-### Set up environment
-    export VERILATOR_ROOT=/opt/verilator
-    export GNU_RISCV_ROOT=/opt/riscv-gnu-toolchain
-    export RISCV_TOOLCHAIN_PATH=$GNU_RISCV_ROOT
-    export LLVM_VORTEX=/opt/llvm-vortex
-    export LLVM_POCL=/opt/llvm-pocl
-    export POCL_CC_PATH=/opt/pocl/compiler
-    export POCL_RT_PATH=/opt/pocl/runtime
-    export PATH=${VERILATOR_ROOT}/bin:${GNU_RISCV_ROOT}/bin/:$PATH
-    export LD_LIBRARY_PATH=${GNU_RISCV_ROOT}:$LD_LIBRARY_PATH
-
-### Build Vortex
-    cd vortex
-    make -s
+Then, build Vortex with `make -j2`.
 
 ### Quick demo running vecadd OpenCL kernel on 2 cores
     ./ci/blackbox.sh --cores=2 --app=vecadd
