@@ -30,10 +30,10 @@ Chihyo (Mark) Ahn (Georgia Institute of Technology)
 |-------------|---------------------------------------------|-------------------|--------|
 | 8:00-8:20   | Intro and GPU background                    | Hyesoon Kim       | [slides](./Slides_MICRO56/1.tutorial_introduction_background.pptx)       |
 | 8:20-9:20   | Vortex Microarchitecture and Software Stack | Blaise Tine       | [slides1](./Slides_MICRO56/2.vortex_microarchitecture.pptx) [slides2](./Slides_MICRO56/3.vortex_software_stack.pptx)       |
-| 9:20-9:40   | CuPBoP: Running OpenCL and CUDA on Vortex   | Chihyo (Mark) Ahn |        |
+| 9:20-9:40   | CuPBoP: Running OpenCL and CUDA on Vortex   | Chihyo (Mark) Ahn | [slides](./Slides_MICRO56/cupbop.pptx)      |
 | 9:40-10:00  | Q&A Session                                 |                   |        |
 | 10:00-10:20 | Coffee Break                                |                   |        |
-| 10:20-11:00 | FPGA Demo & Hands-on Assignments            | Liam Cooper       |        |
+| 10:20-11:00 | FPGA Demo & Hands-on Assignments            | Liam Cooper       | [slides](./Slides_MICRO56/fpga_and_assignments.pptx)      |
 | 11:00-12:00 | Vortex Workshop (3 Speakers)                |                   |        |
 
 ## Tutorial Assignments
