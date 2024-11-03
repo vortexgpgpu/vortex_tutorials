@@ -28,8 +28,8 @@ Chihyo (Mark) Ahn (Georgia Institute of Technology)
 
 | Time        | Contents                                    | Presenter         | slides |
 |-------------|---------------------------------------------|-------------------|--------|
-| 8:00-8:20   | Intro and GPU background                    | Hyesoon Kim       |        |
-| 8:20-9:20   | Vortex Microarchitecture and Software Stack | Blaise Tine       |        |
+| 8:00-8:20   | Intro and GPU background                    | Hyesoon Kim       | [slides](./Slides_MICRO56/1.tutorial_introduction_background.pptx)       |
+| 8:20-9:20   | Vortex Microarchitecture and Software Stack | Blaise Tine       | [slides1](./Slides_MICRO56/2.vortex_microarchitecture.pptx) [slides2](./Slides_MICRO56/3.vortex_software_stack.pptx)       |
 | 9:20-9:40   | CuPBoP: Running OpenCL and CUDA on Vortex   | Chihyo (Mark) Ahn |        |
 | 9:40-10:00  | Q&A Session                                 |                   |        |
 | 10:00-10:20 | Coffee Break                                |                   |        |
