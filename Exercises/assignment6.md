@@ -130,9 +130,10 @@ module VX_alu_dot8 #(
     // Outputs
     VX_commit_if.master commit_if
 );
+    `UNUSED_SPARAM (INSTANCE_ID)
     localparam PID_BITS = `CLOG2(`NUM_THREADS / NUM_LANES);
     localparam PID_WIDTH = `UP(PID_BITS);
-    localparam TAG_WIDTH = `UUID_WIDTH + `NW_WIDTH + NUM_LANES + `XLEN + `NR_BITS + 1 + PID_WIDTH + 1 + 1;
+    localparam TAG_WIDTH = `UUID_WIDTH + `NW_WIDTH + NUM_LANES + `PC_BITS + `NR_BITS + 1 + PID_WIDTH + 1 + 1;
     localparam LATENCY_DOT8 = `LATENCY_DOT8;
     localparam PE_RATIO = 2;
     localparam NUM_PES = `UP(NUM_LANES / PE_RATIO);
@@ -182,8 +183,8 @@ module VX_alu_dot8 #(
         }),
         .ready_in   (execute_if.ready),
         .pe_enable  (pe_enable),
-        .pe_data_in (pe_data_in),
-        .pe_data_out(pe_data_out),
+        .pe_data_in (pe_data_out),
+        .pe_data_out(pe_data_in),
         .valid_out  (commit_if.valid),
         .data_out   (commit_if.data.data),
         .tag_out    ({
