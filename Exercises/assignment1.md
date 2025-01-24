@@ -151,8 +151,8 @@ To test your changes, you can run the software demo using the `--perf=3` command
 You can run the demo application with a different input size to observe how the Warp Efficiency changes under various workloads:
 
 ```bash
-./ci/blackbox.sh --cores=4 --app=demo --perf=3 --driver=rtlsim --args="-n16"
-./ci/blackbox.sh --cores=4 --app=demo --perf=3 --driver=rtlsim --args="-n32"
-./ci/blackbox.sh --cores=4 --app=demo --perf=3 --driver=rtlsim --args="-n64"
-./ci/blackbox.sh --cores=4 --app=demo --perf=3 --driver=rtlsim --args="-n128"
+./ci/blackbox.sh --cores=4 --app=demo --perf=3 --driver=simx --args="-n16"
+./ci/blackbox.sh --cores=4 --app=demo --perf=3 --driver=simx --args="-n32"
+./ci/blackbox.sh --cores=4 --app=demo --perf=3 --driver=simx --args="-n64"
+./ci/blackbox.sh --cores=4 --app=demo --perf=3 --driver=simx --args="-n128"
 ```
