@@ -145,7 +145,7 @@ In this code, `vx_mpm_query` retrieves the counters from the hardware, and then 
 To test your changes, you can run the software demo using the `--perf=3` command line argument. This will display your new `total_issued_warps` and `total_active_threads` counters. Be sure to run `../configure` after making changes to the vortex source in order for the changes to be reflected in the `build` directory.
 
 ```bash
-./ci/blackbox.sh --cores=4 --app=demo --driver=rtlsim --perf=3
+./ci/blackbox.sh --cores=4 --app=demo --driver=simx --perf=3
 ```
 
 You can run the demo application with a different input size to observe how the Warp Efficiency changes under various workloads:
