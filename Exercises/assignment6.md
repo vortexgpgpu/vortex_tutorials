@@ -40,7 +40,7 @@ funct3 and funct7: opcode modifiers.
 ```
 Use custom extension opcode=0x0B with func7=1 and func3=0;
 
-You will need to modify `vx_instrinsics.h` to add your new VX_DOTP8 instruction.
+You will need to modify `vx_instrinsics.h` to add your new VX_DOT8 instruction.
 
 ``` c++
 // DOT8
@@ -69,10 +69,10 @@ void MatrixMultiply(int8_t A[][N], int8_t B[][N], int32_t C[][N], int N) {
       for (int k = 0; k < N; k += 4) {
         // Pack 4 int8_t elements from A and B into 32-bit integers
         uint32_t packedA = *((int*)(A[i] + k));
-        uint32_t packedB = *(int*)(B[k] + j)
-                         | (*(int*)(B[k+1] + j) << 8)
-                         | (*(int*)(B[k+2] + j) << 16)
-                         | (*(int*)(B[k+3] + j) << 24);
+        uint32_t packedB = (uint8_t)B[k][j]
+                         | ((uint8_t)B[k+1][j] << 8)
+                         | ((uint8_t)B[k+2][j] << 16)
+                         | ((uint8_t)B[k+3][j] << 24);
         // Accumulate the dot product result into the C
         C[i][j] += vx_dot8(packedA, packedB);
       }
