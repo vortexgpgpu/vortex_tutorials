@@ -217,6 +217,6 @@ endmodule
 
 ### Step 4: Testing
 
-You will compare your new accelerated dot8 program with the existing sgemm kernel under the regression codebase.
+You will compare your new accelerated dot8 program with the existing sgemmx kernel under the regression codebase.
 You will use N=128 and (warps=4, threads=4) and (Warps=16, threads=16) for 1 and 4 cores.
 Plot the IPC to observe the performance improvement.
