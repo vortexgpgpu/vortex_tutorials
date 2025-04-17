@@ -78,9 +78,9 @@ perf_stats_.total_active_threads += trace->tmask.count();
 
 ### Step 5: Expose the Counters in the Runtime
 
-In the `vx_dump_perf` function in [`vortex/runtime/stub/vx_utils.cpp`](https://github.com/vortexgpgpu/vortex/blob/master/runtime/stub/vx_utils.cpp#L216), retrieve the values for `total_issued_warps` and `total_active_threads` and use them to calculate warp efficiency.
+In the `vx_dump_perf` function in [`vortex/runtime/stub/utils.cpp`](https://github.com/vortexgpgpu/vortex/blob/master/runtime/stub/utils.cpp#L159), retrieve the values for `total_issued_warps` and `total_active_threads` and use them to calculate warp efficiency.
 
-In `vx_utils.cpp`, add the following code to fetch the values from the CSR and calculate warp efficiency:
+In `utils.cpp`, add the following code to fetch the values from the CSR and calculate warp efficiency:
 
 At the end of the other counter declarations in `vx_dump_perf`, add:
 ```cpp
@@ -89,7 +89,7 @@ uint64_t total_issued_warps = 0;
 uint64_t total_active_threads = 0;
 ```
 
-Then, add a new case for VX_DCR_MPM_CLASS_3 to calculate and print per-core Warp Efficiency in [`vortex/runtime/stub/vx_utils.cpp`](https://github.com/vortexgpgpu/vortex/blob/master/runtime/stub/vx_utils.cpp#L550):
+Then, add a new case for VX_DCR_MPM_CLASS_3 to calculate and print per-core Warp Efficiency in [`vortex/runtime/stub/utils.cpp`](https://github.com/vortexgpgpu/vortex/blob/master/runtime/stub/utils.cpp#L558):
 ```cpp
     case VX_DCR_MPM_CLASS_3:
     {
@@ -125,7 +125,7 @@ Then, add a new case for VX_DCR_MPM_CLASS_3 to calculate and print per-core Warp
     break;
 ```
 
-and add the new case to calculate and print the total average Warp Efficiency of the GPU in [`vortex/runtime/stub/vx_utils.cpp`](https://github.com/vortexgpgpu/vortex/blob/master/runtime/stub/vx_utils.cpp#L630):
+and add the new case to calculate and print the total average Warp Efficiency of the GPU in [`vortex/runtime/stub/utils.cpp`](https://github.com/vortexgpgpu/vortex/blob/master/runtime/stub/utils.cpp#L638):
 ```cpp
 case VX_DCR_MPM_CLASS_3: {
     uint64_t threads_per_warp;
