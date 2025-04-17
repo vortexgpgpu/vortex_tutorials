@@ -117,8 +117,8 @@ case 1:
   case 0: { // DOT8
       trace->fu_type = FUType::ALU;
       trace->alu_type = AluType::DOT8;
-      trace->src_regs.set(rsrc0);
-      trace->src_regs.set(rsrc1);
+      trace->src_regs[0] = {RegType::Integer, rsrc0};
+      trace->src_regs[1] = {RegType::Integer, rsrc1};
       for (uint32_t t = thread_start; t < num_threads; ++t) {
         if (!warp.tmask.test(t))
           continue;
