@@ -139,9 +139,6 @@ module VX_alu_dot8 #(
     localparam NUM_PES = `UP(NUM_LANES / PE_RATIO);
 
     `UNUSED_VAR (execute_if.data.op_type)
-    `UNUSED_VAR (execute_if.data.op_mod)
-    `UNUSED_VAR (execute_if.data.use_PC)
-    `UNUSED_VAR (execute_if.data.use_imm)
     `UNUSED_VAR (execute_if.data.tid)
     `UNUSED_VAR (execute_if.data.rs3_data)
 
