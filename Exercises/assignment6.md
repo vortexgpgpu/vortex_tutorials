@@ -40,7 +40,7 @@ funct3 and funct7: opcode modifiers.
 ```
 Use custom extension opcode=0x0B with func7=1 and func3=0;
 
-You will need to modify `vx_instrinsics.h` to add your new VX_DOT8 instruction.
+You will need to modify `vx_intrinsics.h` to add your new VX_DOT8 instruction.
 
 ``` c++
 // DOT8
