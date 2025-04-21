@@ -200,12 +200,12 @@ module VX_alu_dot8 #(
 
     // PEs instancing
     for (genvar i = 0; i < NUM_PES; ++i) begin
-        wire [31:0] a = pe_data_in[i][0 +: 32];
-        wire [31:0] b = pe_data_in[i][32 +: 32];
+        wire [63:0] a = pe_data_in[i][0 +: 64];
+        wire [63:0] b = pe_data_in[i][64 +: 64];
         // TODO:
         wire [31:0] result;
-        `BUFFER_EX(result, c, pe_enable, LATENCY_DOT8);
-        assign pe_data_out[i] = result;
+        `BUFFER_EX(result, c, pe_enable, 1, LATENCY_DOT8); // c is the result of the dot product
+        assign pe_data_out[i] = {{(`XLEN-32){1'b0}}, result};
     end
 
 endmodule
