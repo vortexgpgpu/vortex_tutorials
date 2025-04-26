@@ -40,7 +40,7 @@ funct3 and funct7: opcode modifiers.
 ```
 Use custom extension opcode=0x0B with func7=1 and func3=0;
 
-You will need to modify `vx_instrinsics.h` to add your new VX_DOT8 instruction.
+You will need to modify `vx_intrinsics.h` to add your new VX_DOT8 instruction.
 
 ``` c++
 // DOT8
@@ -200,12 +200,12 @@ module VX_alu_dot8 #(
 
     // PEs instancing
     for (genvar i = 0; i < NUM_PES; ++i) begin
-        wire [31:0] a = pe_data_in[i][0 +: 32];
-        wire [31:0] b = pe_data_in[i][32 +: 32];
+        wire [XLEN-1:0] a = pe_data_in[i][0 +: XLEN];
+        wire [XLEN-1:0] b = pe_data_in[i][XLEN +: XLEN];
         // TODO:
         wire [31:0] result;
-        `BUFFER_EX(result, c, pe_enable, LATENCY_DOT8);
-        assign pe_data_out[i] = result;
+        `BUFFER_EX(result, c, pe_enable, 1, LATENCY_DOT8); // c is the result of the dot product
+        assign pe_data_out[i] = `XLEN'(result);
     end
 
 endmodule
