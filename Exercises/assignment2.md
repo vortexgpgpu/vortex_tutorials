@@ -35,8 +35,8 @@ Next, you need to add logic to expose these counters in the CSR. In [VX_csr_data
 `VX_DCR_MPM_CLASS_3: begin
     case (read_addr)
     // Add your custom counters here for Class 3:
-    `CSR_READ_64(`VX_CSR_MPM_TOTAL_ISSUED_WARPS, read_data_ro_w, pipeline_perf_if.sched.total_issued_warps);
-    `CSR_READ_64(`VX_CSR_MPM_TOTAL_ACTIVE_THREADS, read_data_ro_w, pipeline_perf_if.sched.total_active_threads);
+    `CSR_READ_64(`VX_CSR_MPM_TOTAL_ISSUED_WARPS, read_data_ro_w, pipeline_perf.sched.total_issued_warps);
+    `CSR_READ_64(`VX_CSR_MPM_TOTAL_ACTIVE_THREADS, read_data_ro_w, pipeline_perf.sched.total_active_threads);
     default:;
     endcase
 end
