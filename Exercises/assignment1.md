@@ -42,8 +42,10 @@ Next, you need to add logic to expose these counters in the CSR. In [emulator.cp
 ```c++
 case VX_DCR_MPM_CLASS_3: {
   // Add your custom counters here for Class 3:
-  CSR_READ_64(VX_CSR_MPM_TOTAL_ISSUED_WARPS, core_perf.total_issued_warps);
-  CSR_READ_64(VX_CSR_MPM_TOTAL_ACTIVE_THREADS, core_perf.total_active_threads);
+  switch (addr) {
+    CSR_READ_64(VX_CSR_MPM_TOTAL_ISSUED_WARPS, core_perf.total_issued_warps);
+    CSR_READ_64(VX_CSR_MPM_TOTAL_ACTIVE_THREADS, core_perf.total_active_threads);
+  }
 } break;
 ```
 
