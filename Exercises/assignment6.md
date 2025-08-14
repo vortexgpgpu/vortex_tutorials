@@ -38,7 +38,7 @@ where:
 opcode: opcode reserved for custom instructions.
 funct3 and funct7: opcode modifiers.
 ```
-Use custom extension opcode=0x0B with func7=1 and func3=0;
+Use custom extension opcode=0x0B with func7=9 and func3=0;
 
 You will need to modify `vx_intrinsics.h` to add your new VX_DOT8 instruction.
 
@@ -98,26 +98,32 @@ Modify the RTL code to implement the custom ISA extension. We recommend checking
 - Update `hw/rtl/core/VX_decode.sv` to decode the new instruction. Select the ALU functional unit for executing this new instruction.
 
 ``` verilog
-7'h01: begin
-    case (func3)
-        3'h0: begin // DOT8
-            ex_type = // TODO: destination functional unit
-            op_type = // TODO: instruction type
-            use_rd =  // TODO: writing back to rd
-            // TODO: set using rd
-            // TODO: set using rs1
-            // TODO: set using rs2
-        end
-        default:;
-    endcase
-end
+`ifdef EXT_DOT8_ENABLE
+    7'h09: begin
+        case (funct3)
+            3'h0: begin // DOT8
+                ex_type = // TODO: destination functional unit
+                op_type = // TODO: instruction type
+                op_args.alu.xtype = // TODO
+                use_rd =  // TODO: writing back to rd
+                // TODO: set using rd
+                // TODO: set using rs1
+                // TODO: set using rs2
+
+            end
+            default:;
+        endcase
+    end
+`endif
+
+
 ```
 - Create a new VX\_alu\_dot8.sv module that implements DOT8
 
 ``` verilog
 `include "VX_define.vh"
 
-module VX_alu_dot8 #(
+module VX_alu_dot8 import VX_gpu_pkg::*; #(
     parameter `STRING INSTANCE_ID = "",
     parameter NUM_LANES = 1
 ) (
@@ -128,23 +134,23 @@ module VX_alu_dot8 #(
     VX_execute_if.slave execute_if,
 
     // Outputs
-    VX_commit_if.master commit_if
+    VX_result_if.master result_if
 );
     `UNUSED_SPARAM (INSTANCE_ID)
     localparam PID_BITS = `CLOG2(`NUM_THREADS / NUM_LANES);
     localparam PID_WIDTH = `UP(PID_BITS);
-    localparam TAG_WIDTH = `UUID_WIDTH + `NW_WIDTH + NUM_LANES + `PC_BITS + `NR_BITS + 1 + PID_WIDTH + 1 + 1;
+    localparam TAG_WIDTH = UUID_WIDTH + NW_WIDTH + NUM_LANES + PC_BITS + NUM_REGS_BITS + 1 + PID_WIDTH + 1 + 1;
     localparam LATENCY_DOT8 = `LATENCY_DOT8;
     localparam PE_RATIO = 2;
     localparam NUM_PES = `UP(NUM_LANES / PE_RATIO);
+    // localparam MUL_LATENCY = 1;
 
     `UNUSED_VAR (execute_if.data.op_type)
-    `UNUSED_VAR (execute_if.data.tid)
     `UNUSED_VAR (execute_if.data.rs3_data)
 
     wire [NUM_LANES-1:0][2*`XLEN-1:0] data_in;
 
-    for (genvar i = 0; i < NUM_LANES; ++i) begin
+    for (genvar i = 0; i < NUM_LANES; ++i) begin : g_dot8_lanes
         assign data_in[i][0 +: `XLEN] = execute_if.data.rs1_data[i];
         assign data_in[i][`XLEN +: `XLEN] = execute_if.data.rs2_data[i];
     end
@@ -182,26 +188,26 @@ module VX_alu_dot8 #(
         .pe_enable  (pe_enable),
         .pe_data_in (pe_data_out),
         .pe_data_out(pe_data_in),
-        .valid_out  (commit_if.valid),
-        .data_out   (commit_if.data.data),
+        .valid_out  (result_if.valid),
+        .data_out   (result_if.data.data),
         .tag_out    ({
-            commit_if.data.uuid,
-            commit_if.data.wid,
-            commit_if.data.tmask,
-            commit_if.data.PC,
-            commit_if.data.rd,
-            commit_if.data.wb,
-            commit_if.data.pid,
-            commit_if.data.sop,
-            commit_if.data.eop
+            result_if.data.uuid,
+            result_if.data.wid,
+            result_if.data.tmask,
+            result_if.data.PC,
+            result_if.data.rd,
+            result_if.data.wb,
+            result_if.data.pid,
+            result_if.data.sop,
+            result_if.data.eop
         }),
-        .ready_out  (commit_if.ready)
+        .ready_out  (result_if.ready)
     );
 
     // PEs instancing
-    for (genvar i = 0; i < NUM_PES; ++i) begin
-        wire [XLEN-1:0] a = pe_data_in[i][0 +: XLEN];
-        wire [XLEN-1:0] b = pe_data_in[i][XLEN +: XLEN];
+    for (genvar i = 0; i < NUM_PES; ++i) begin : g_dot8
+        wire [XLEN-1:0] a = pe_data_in[i][0 +: XLEN];    // rs1
+        wire [XLEN-1:0] b = pe_data_in[i][XLEN +: XLEN];  // rs2
         // TODO:
         wire [31:0] result;
         `BUFFER_EX(result, c, pe_enable, 1, LATENCY_DOT8); // c is the result of the dot product
