@@ -66,7 +66,7 @@ There has been increasing interest in developing and accelerating mixed-precisio
 
 ### Bio
 **Hansung Kim**  
-Hansung Kim is a Ph.D. candidate at the University of California, Berkeley. His research focuses on computer architecture, with an emphasis on open-source GPU systems, heterogeneous computing, and hardware/software co-design. He has been actively involved in the Vortex project and its extensions, and his work highlights how Vortex enabled the development of the Virgo platform.
+Hansung Kim is a Ph.D. candidate at the University of California, Berkeley. 
 
 ---
 
