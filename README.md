@@ -18,17 +18,60 @@ Chihyo (Mark) Ahn (Georgia Institute of Technology)
 
 Shinnung Jeong (Georgia Institute of Technology)
 
-## Tentative Tutorial Schedule
+## Tentative Tutorial and Workshop Schedule
 
 | Time        | Contents                                    | Presenter         | slides |
 |-------------|---------------------------------------------|-------------------|--------|
 | 8:00-8:20   | Intro and GPU background                    | Hyesoon Kim       |  |
 | 8:20-9:20   | Vortex Microarchitecture and Software Stack | Blaise Tine       | | 
 | 9:20-9:40   | CuPBoP: Running OpenCL and CUDA on Vortex   | Chihyo (Mark) Ahn | ||
-| 9:40-10:00  | Q&A Session                                 |                   |        |
-| 10:00-10:20 | Coffee Break                                |                   |        |
-| 10:20-11:00 | Vortex Software |   |   | 
-| 11:00-12:00 | Vortex Workshop             |                   |        |
+| 9:40-10:00  | Vortex Tutorial Assignment                           |                   |        |
+| 10:00-10:30 | Q&A and Coffee Break                                |                   |        |
+| 10:30-11:40 | Vortex Workshop 
+| 11:40-12:00 | Review of Tutorial Assignments              |                   |        |
+
+
+# Vortex Workshop Info
+
+---
+
+## Portable Vortex HDL for FPGA and ASIC Technologies  
+**Presenters:** Jamie Kelly (enVention, LLC) and Scott O’Malia (enVention, LLC)
+
+### Abstract
+In this work, we analyze the open-source Vortex GPGPU HDL source code for portability between FPGA and ASIC target technologies. Beyond coding HDL source for legal RTL synthesis, several architecture aspects should be considered to ease technology retargeting without significant HDL source changes. Clock and reset trees and fanout control can be planned at the HDL level. Required sync and async reset types can vary with target technology, warranting a generic, global method to automatically handle each case. Special handling of clock and reset domain crossings may be required. Well-planned design hierarchy can aid floorplanning for back-end tools. Technology-specific leaf cells, such as static RAMs and arithmetic multipliers, should be wrapped using a common interface and parameter set. RAM wrappers can contain special reset control state machines to directly initialize RAM contents for many ASIC technologies that do not support this function. HDL logic pipelining and technology timing closure rely heavily on the use of flip-flop cells for delay. FPGA and ASIC flip-flop area costs are quite different, especially when complex scan-style cells are needed for ASIC manufacturing testing. The ratio of combinatorial look-up tables to flip-flops is examined. The Vortex GPGPU HDL source is analyzed for each of these cited aspects, and the results and suggested improvements are presented in this paper.
+
+### Bios
+**Jamie Kelly**  
+Jamie Kelly (MS EE ‘97, MS Physics ‘07) has worked in hardware, software, FPGA, and ASIC development for more than 25 years. He has expertise in telecommunications/networking, packet switching/queuing, Linux kernel/device drivers, and end-to-end FPGA/ASIC design. Jamie currently serves as the Director of Hardware Engineering at enVention, LLC in Huntsville, Alabama, USA.
+
+**Scott O’Malia**  
+Scott O'Malia (BS MET ’09, BS EE ’13) is an Electrical Engineer at enVention, LLC with over 10 years of experience in FPGA verification, embedded systems, and safety-critical hardware/software design. His expertise includes HDL development and verification, applying DO-178/DO-254 rigor for flight-critical applications, and advancing vendor-independent FPGA verification solutions for long-term sustainment.
+
+---
+
+## A Configurable Mixed-Precision Fused Dot Product Unit for GPGPU Tensor Computation  
+**Presenters:** Nikhil Rout (Vellore Institute of Technology) and Blaise Tine (UCLA)
+
+### Abstract
+There has been increasing interest in developing and accelerating mixed-precision Matrix-Multiply-Accumulate operations in GPGPUs for Deep Learning workloads. However, existing open-source RTL implementations of inner dot product units rely on discrete arithmetic units, leading to suboptimal throughput and poor resource utilization. To address these challenges, we propose a scalable mixed-precision dot product unit that integrates floating-point and integer arithmetic pipelines within a singular fused architecture, implemented as part of the open-source RISC-V based Vortex GPGPU’s Tensor Core Unit extension. Our design supports low-precision multiplication in FP16/BF16/FP8/BF8/INT8/UINT4 formats and higher-precision accumulation in FP32/INT32, with an extensible framework for adding and evaluating other custom representations in the future. Experimental results demonstrate 4-cycle operation latency at 362.2 MHz clock frequency on the AMD Xilinx Alveo U55C FPGA, delivering an ideal filled pipeline throughput of 11.948 GFlops in a 4-thread configuration.
+
+---
+
+## How Vortex Made Virgo Possible  
+**Presenter:** Hansung Kim (UC Berkeley)
+
+### Abstract
+*Abstract text to be provided.*
+
+### Bio
+**Hansung Kim**  
+Hansung Kim is a Ph.D. candidate at the University of California, Berkeley. His research focuses on computer architecture, with an emphasis on open-source GPU systems, heterogeneous computing, and hardware/software co-design. He has been actively involved in the Vortex project and its extensions, and his work highlights how Vortex enabled the development of the Virgo platform.
+
+---
+
+
+
 
 ## Tutorial Assignments
 
