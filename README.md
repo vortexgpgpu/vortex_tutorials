@@ -22,9 +22,10 @@ Shinnung Jeong (Georgia Institute of Technology)
 
 | Time        | Contents                                    | Presenter         | slides |
 |-------------|---------------------------------------------|-------------------|--------|
-| 8:00-8:20   | Intro and GPU background                    | Hyesoon Kim       |  |
-| 8:20-9:20   | Vortex Microarchitecture and Software Stack | Blaise Tine       | | 
-| 9:20-9:40   | CuPBoP: Running OpenCL and CUDA on Vortex   | Chihyo (Mark) Ahn | ||
+| 8:00-8:10   | Intro and GPU background                    | Hyesoon Kim       |  |
+| 8:10-9:10   | Vortex Microarchitecture and Software Stack | Blaise Tine       | | 
+| 9:10-9:25   | Vortex Compiler and running OpenCL          | Shinnung Jeong       | | 
+| 9:25-9:40   | CuPBoP: Running  CUDA on Vortex   | Chihyo (Mark) Ahn | ||
 | 9:40-10:00  | Vortex Tutorial Assignment                           |                   |        |
 | 10:00-10:30 | Q&A and Coffee Break                                |                   |        |
 | 10:30-11:40 | Vortex Workshop 
