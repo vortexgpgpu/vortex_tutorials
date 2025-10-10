@@ -103,7 +103,10 @@ If you would like to set up Vortex on your own system, [instructions can be foun
 ## Relevant Repos
 
 * [Vortex](https://github.com/vortexgpgpu/vortex)
+* 
 * [Vortex Toolchain](https://github.com/vortexgpgpu/vortex-toolchain-prebuilt)
+
+* [Cupbop on Vortex] (https://github.com/cupbop/CuPBoP_Vortex)
 
 ## Mailing list
 For tutorial info please join  https://docs.google.com/forms/d/1r8E-Yo5NwA45Hi3-kEwte4AxK0mBsYDwgjM6Bul4so0/edit
