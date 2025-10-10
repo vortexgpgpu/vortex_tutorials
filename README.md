@@ -54,6 +54,9 @@ Scott O'Malia (BS MET ’09, BS EE ’13) is an Electrical Engineer at enVention
 ## A Configurable Mixed-Precision Fused Dot Product Unit for GPGPU Tensor Computation  
 **Presenters:** Nikhil Rout (Vellore Institute of Technology) and Blaise Tine (UCLA)
 
+Nikhil Rout is a 4th-year undergraduate student in ECE at the Vellore Institute of Technology, Chennai. He has been a research intern with the Vortex GPGPU group since summer 2025, advised by Prof. Blaise Tine. His research interests lie in GPGPUs and DNN accelerators at the microarchitecture abstraction level.
+
+
 ### Abstract
 There has been increasing interest in developing and accelerating mixed-precision Matrix-Multiply-Accumulate operations in GPGPUs for Deep Learning workloads. However, existing open-source RTL implementations of inner dot product units rely on discrete arithmetic units, leading to suboptimal throughput and poor resource utilization. To address these challenges, we propose a scalable mixed-precision dot product unit that integrates floating-point and integer arithmetic pipelines within a singular fused architecture, implemented as part of the open-source RISC-V based Vortex GPGPU’s Tensor Core Unit extension. Our design supports low-precision multiplication in FP16/BF16/FP8/BF8/INT8/UINT4 formats and higher-precision accumulation in FP32/INT32, with an extensible framework for adding and evaluating other custom representations in the future. Experimental results demonstrate 4-cycle operation latency at 362.2 MHz clock frequency on the AMD Xilinx Alveo U55C FPGA, delivering an ideal filled pipeline throughput of 11.948 GFlops in a 4-thread configuration.
 
