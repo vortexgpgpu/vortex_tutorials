@@ -58,7 +58,7 @@ There has been increasing interest in developing and accelerating mixed-precisio
 
 ---
 
-## How Vortex Made Virgo Possible  
+## Virgo and Muon: Enabling Scalable Matrix Units and a New ASIC-Focused SIMT Core with Vortex
 **Presenter:** Hansung Kim (UC Berkeley)
 
 ### Abstract
@@ -66,7 +66,10 @@ There has been increasing interest in developing and accelerating mixed-precisio
 
 ### Bio
 **Hansung Kim**  
-Hansung Kim is a Ph.D. candidate at the University of California, Berkeley. 
+Hansung Kim is a 6th-year Ph.D. student in EECS at UC Berkeley, advised by Prof. Sophia Shao. His work focuses on GPU microarchitecture and
+hardware/software co-design, with strong technical expertise in RTL implementation, GPU kernel development, and SoC integration.  He is currently
+on the job market for industry positions and welcomes opportunities to connect.
+
 
 ---
 
