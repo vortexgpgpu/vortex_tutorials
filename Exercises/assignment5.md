@@ -62,7 +62,7 @@ Implement a simple matrix multiplication GPU kernel that uses your new H/W exten
 Here is a basic C++ implementation of the kernel that uses our new VX\_DOT8 instruction:
 
 ``` c++
-void MatrixMultiply(int8_t A[][N], int8_t B[][N], int32_t C[][N], int N) {
+void MatrixMultiply(int32_t A[][N], int8_t B[][N], int32_t C[][N], int N) {
   for (int i = 0; i < N; ++i) {
     for (int j = 0; j < N; ++j) {
       C[i][j] = 0;
@@ -85,7 +85,8 @@ void MatrixMultiply(int8_t A[][N], int8_t B[][N], int32_t C[][N], int N) {
 - Clone sgemmx test under https://github.com/vortexgpgpu/vortex/blob/master/tests/regression/sgemmx into a new folder `tests/regressions/dot8`.
 
 - Set PROJECT name to `dot8` in `tests/regressions/dot8/Makefile`
-- Update `matmul_cpu` in main.cpp to operate on `int8_t` matrices.
+- Update `matmul_cpu` in `main.cpp` to operate on `int8_t` input matrices and `int32_t` output destination.
+- Ensure `vx_mem_alloc`, `vx_copy_to_dev`, and `vx_copy_from_dev` in `main.cpp` are using the correct size of their buffer in bytes.
 - Update `kernel_body` in `tests/regressions/dot8/kernel.cpp` to use `vx_dot8` intrinsic function.
 
 ### Step 3: Simulation implementation
@@ -93,7 +94,7 @@ void MatrixMultiply(int8_t A[][N], int8_t B[][N], int32_t C[][N], int N) {
 Modify the cycle-level simulator to implement the custom ISA extension.
 We recommend checking out how VX_SPLIT and VX_PRED instructions are decoded in SimX as a reference.
 
- - Update `AluType` enum in `types.h` to include our new DOT8 type.
+ - Update `AluType` enum in `types.h` to include our new DOT8 type, do not forget ostream << operator.
  - Update `op_string()` in `decode.cpp` to print out the new instruction.
  - Update `Emulator::decode()` in `decode.cpp` to decode the new instruction format.
 
@@ -105,6 +106,7 @@ case 2: {
   case 0: { // DOT8
     auto instr = std::allocate_shared<Instr>(instr_pool_, uuid, FUType::ALU);
     instr->setOpType(AluType::DOT8);
+    instr->setArgs(IntrAluArgs{0, 0, 0});
     instr->setDestReg(rd, RegType::Integer);
     instr->setSrcReg(0, rs1, RegType::Integer);
     instr->setSrcReg(1, rs2, RegType::Integer);
@@ -150,6 +152,6 @@ case AluType::DOT8:
 
 ### Step 4: Testing
 
-You will compare your new accelerated dot8 program with the existing sgemmx kernel under the regression codebase.
-You will use N=128 and (warps=4, threads=4) and (Warps=16, threads=16) for 1 and 4 cores.
-Plot the total execution cycles to observe the performance improvement.
+You will compare your new accelerated dot8 program with a corresponding baseline int8_t kernel.
+You will use N=256 and (warps=4, threads=4), (warps=4, threads=8), (warps=8, threads=4), and (warps=8, threads=8) on a 4-core GPU.
+Plot the total instruction count and execution cycles to observe the performance improvement.
