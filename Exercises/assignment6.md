@@ -69,7 +69,7 @@ void MatrixMultiply(int8_t A[][N], int8_t B[][N], int32_t C[][N], int N) {
       for (int k = 0; k < N; k += 4) {
         // Pack 4 int8_t elements from A and B into 32-bit integers
         uint32_t packedA = *((int*)(A[i] + k));
-        uint32_t packedB = (uint8_t)B[k][j]
+        uint32_t packedB = ((uint8_t)B[k+0][j] << 0)
                          | ((uint8_t)B[k+1][j] << 8)
                          | ((uint8_t)B[k+2][j] << 16)
                          | ((uint8_t)B[k+3][j] << 24);
@@ -79,14 +79,13 @@ void MatrixMultiply(int8_t A[][N], int8_t B[][N], int32_t C[][N], int N) {
     }
   }
 }
-
 ```
 
 - Clone sgemmx test under https://github.com/vortexgpgpu/vortex/blob/master/tests/regression/sgemmx into a new folder `tests/regressions/dot8`.
-
 - Set PROJECT name to `dot8` in `tests/regressions/dot8/Makefile`
-- Update `matmul_cpu` in main.cpp to operate on `int8_t` matrices.
-- Update `kernel_body` in `tests/regressions/dot8/kernel.cpp` to use `vx_dot8`
+- Update `matmul_cpu` in `main.cpp` to operate on `int8_t` input matrices and `int32_t` output destination.
+- Ensure `vx_mem_alloc`, `vx_copy_to_dev`, and `vx_copy_from_dev` in `main.cpp` are using the correct size of their buffer in bytes.
+- Update `kernel_body` in `tests/regressions/dot8/kernel.cpp` to use `vx_dot8` intrinsic function.
 
 ### Step 3: Hardware RTL implementation
 
