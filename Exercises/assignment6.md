@@ -3,6 +3,7 @@
 This assignment will introduce you to the basics of extending GPU Microarchitecture to accelerate a kernel in hardware
 You will add a new RISC-V custom instruction for computing the integer dot product: VX\_DOT8.
 You will also implement this instruction in the hardware RTL.
+Prerequisite: We recommend completing the prior assignment on the Dot8 simulation before this one.
 
 ### Step 1: ISA Extension
 
@@ -38,7 +39,7 @@ where:
 opcode: opcode reserved for custom instructions.
 funct3 and funct7: opcode modifiers.
 ```
-Use custom extension opcode=0x0B with funct7=2 and funct3=0;
+Use custom extension opcode=0x0B with funct7=3 and funct3=0;
 
 You will need to modify `vx_intrinsics.h` to add your new VX_DOT8 instruction.
 
@@ -89,15 +90,15 @@ void MatrixMultiply(int8_t A[][N], int8_t B[][N], int32_t C[][N], int N) {
 
 ### Step 3: Hardware RTL implementation
 
-Modify the RTL code to implement the custom ISA extension. We recommend checking out how MULT instructions are decoded and executed in RTL as reference.
+Modify the RTL code to implement the custom ISA extension. We recommend checking out how MULT instructions are decoded and executed in RTL as a reference.
 
-- Update `hw/rtl/VX_define.vh` to define `INST_ALU_DOT8` as `4'b0001`
+- Update `hw/rtl/VX_gpu_pkg.vh` to replace `INST_ALU_UNUSED` with `INST_ALU_DOT8`
 - Update `hw/rtl/VX_config.vh` to define `LATENCY_DOT8` as 2
-- Update `dpi_trace()` in `hw/rtl/VX_gpu_pkg.sv` to print the new instruction
+- Update `hw/rtl/VX_trace_pkg.vh` to include "DOT8" trace
 - Update `hw/rtl/core/VX_decode.sv` to decode the new instruction. Select the ALU functional unit for executing this new instruction.
 
 ``` verilog
-7'h01: begin
+7'h03: begin
     case (funct3)
         3'h0: begin // DOT8
             ex_type = // TODO: destination functional unit
