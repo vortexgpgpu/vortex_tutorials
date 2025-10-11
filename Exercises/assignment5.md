@@ -38,7 +38,7 @@ where:
 opcode: opcode reserved for custom instructions.
 funct3 and funct7: opcode modifiers.
 ```
-Use custom extension opcode=0x0B with funct7=2 and funct3=0;
+Use custom extension opcode=0x0B with funct7=3 and funct3=0;
 
 You will need to modify `vx_intrinsics.h` to add your new VX_DOT8 instruction.
 
@@ -99,15 +99,14 @@ We recommend checking out how VX_SPLIT and VX_PRED instructions are decoded in S
 ``` c++
 switch (funct7) {
 ...
-case 2: {
+case 3: {
   switch (funct3) {
   case 0: { // DOT8
     auto instr = std::allocate_shared<Instr>(instr_pool_, uuid, FUType::ALU);
     instr->setOpType(AluType::DOT8);
     instr->setArgs(IntrAluArgs{0, 0, 0});
-    instr->setDestReg(rd, RegType::Integer);
-    instr->setSrcReg(0, rs1, RegType::Integer);
-    instr->setSrcReg(1, rs2, RegType::Integer);
+    // TODO: set destination register
+    // TODO: set source registers
     ibuffer.push_back(instr);
   } break;
   default:
@@ -120,23 +119,18 @@ case 2: {
  - Update `Emulator::execute()` in `execute.cpp` to implement the actual `VX_DOT8` emulation. You will execute the new instruction on the ALU functional unit.
 
 ``` c++
-switch (funct7) {
-case 1:
-  switch (funct3) {
-  case 0: { // DOT8
-      trace->fu_type = FUType::ALU;
-      trace->alu_type = AluType::DOT8;
-      trace->src_regs[0] = {RegType::Integer, rsrc0};
-      trace->src_regs[1] = {RegType::Integer, rsrc1};
-      for (uint32_t t = thread_start; t < num_threads; ++t) {
-        if (!warp.tmask.test(t))
-          continue;
-        // TODO:
-      }
-      rd_write = true;
-    } break;
-  } break;
-}
+case AluType::DOT8: {
+  for (uint32_t t = thread_start; t < num_threads; ++t) {
+    if (!warp.tmask.test(t))
+      continue;
+    uint32_t packedA = rs1_data[t].u;
+    uint32_t packedB = rs2_data[t].u;
+    int32_t sum;
+    // TODO:
+    DP(3, "*** DOT8[" << t << "]: a=0x" << std::hex << packedA << ", b=0x" << packedB << ", c=0x" << sum << std::dec);
+    rd_data[t].i = sum;
+  }
+} break;
 ```
 
  - Update `AluUnit::tick()` in `func_unit.cpp` to implement the timing of `VX_DOT8`.
