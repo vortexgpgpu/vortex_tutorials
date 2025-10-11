@@ -38,7 +38,7 @@ where:
 opcode: opcode reserved for custom instructions.
 funct3 and funct7: opcode modifiers.
 ```
-Use custom extension opcode=0x0B with func7=1 and func3=0;
+Use custom extension opcode=0x0B with funct7=2 and funct3=0;
 
 You will need to modify `vx_intrinsics.h` to add your new VX_DOT8 instruction.
 
@@ -69,7 +69,7 @@ void MatrixMultiply(int8_t A[][N], int8_t B[][N], int32_t C[][N], int N) {
       for (int k = 0; k < N; k += 4) {
         // Pack 4 int8_t elements from A and B into 32-bit integers
         uint32_t packedA = *((int*)(A[i] + k));
-        uint32_t packedB = (uint8_t)B[k][j]
+        uint32_t packedB = ((uint8_t)B[k+0][j] << 0)
                          | ((uint8_t)B[k+1][j] << 8)
                          | ((uint8_t)B[k+2][j] << 16)
                          | ((uint8_t)B[k+3][j] << 24);
@@ -86,34 +86,43 @@ void MatrixMultiply(int8_t A[][N], int8_t B[][N], int32_t C[][N], int N) {
 
 - Set PROJECT name to `dot8` in `tests/regressions/dot8/Makefile`
 - Update `matmul_cpu` in main.cpp to operate on `int8_t` matrices.
-- Update `kernel_body` in `tests/regressions/dot8/kernel.cpp` to use `vx_dot8`
+- Update `kernel_body` in `tests/regressions/dot8/kernel.cpp` to use `vx_dot8` intrinsic function.
 
 ### Step 3: Simulation implementation
 
-Modify the cycle level simulator to implement the custom ISA extension.
-We recommend checking out how VX_SPLIT and VX_PRED instructions are decoded in SimX as reference.
+Modify the cycle-level simulator to implement the custom ISA extension.
+We recommend checking out how VX_SPLIT and VX_PRED instructions are decoded in SimX as a reference.
 
+ - Update `AluType` enum in `types.h` to include our new DOT8 type.
  - Update `op_string()` in `decode.cpp` to print out the new instruction.
  - Update `Emulator::decode()` in `decode.cpp` to decode the new instruction format.
 
 ``` c++
-switch (func7) {
-case 1:
-  switch (func3) {
-  case 0:  // DOT8
+switch (funct7) {
+...
+case 2: {
+  switch (funct3) {
+  case 0: { // DOT8
+    auto instr = std::allocate_shared<Instr>(instr_pool_, uuid, FUType::ALU);
+    instr->setOpType(AluType::DOT8);
     instr->setDestReg(rd, RegType::Integer);
-    instr->addSrcReg(rs1, RegType::Integer);
-    instr->addSrcReg(rs2, RegType::Integer);
-    break;
- ```
+    instr->setSrcReg(0, rs1, RegType::Integer);
+    instr->setSrcReg(1, rs2, RegType::Integer);
+    ibuffer.push_back(instr);
+  } break;
+  default:
+    std::abort();
+  }
+} break;
+```
 
  - Update `AluType` enum in `types.h` to add `DOT8` type
  - Update `Emulator::execute()` in `execute.cpp` to implement the actual `VX_DOT8` emulation. You will execute the new instruction on the ALU functional unit.
 
 ``` c++
-switch (func7) {
+switch (funct7) {
 case 1:
-  switch (func3) {
+  switch (funct3) {
   case 0: { // DOT8
       trace->fu_type = FUType::ALU;
       trace->alu_type = AluType::DOT8;
@@ -131,7 +140,7 @@ case 1:
 ```
 
  - Update `AluUnit::tick()` in `func_unit.cpp` to implement the timing of `VX_DOT8`.
- You will assume 2 cycles latency for the dot-product execution.
+ You will assume a 2-cycle latency for the dot-product execution.
 
  ``` c++
 case AluType::DOT8:
