@@ -62,7 +62,7 @@ Implement a simple matrix multiplication GPU kernel that uses your new H/W exten
 Here is a basic C++ implementation of the kernel that uses our new VX\_DOT8 instruction:
 
 ``` c++
-void MatrixMultiply(int32_t A[][N], int8_t B[][N], int32_t C[][N], int N) {
+void MatrixMultiply(int8_t A[][N], int8_t B[][N], int32_t C[][N], int N) {
   for (int i = 0; i < N; ++i) {
     for (int j = 0; j < N; ++j) {
       C[i][j] = 0;
