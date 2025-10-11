@@ -38,7 +38,7 @@ where:
 opcode: opcode reserved for custom instructions.
 funct3 and funct7: opcode modifiers.
 ```
-Use custom extension opcode=0x0B with func7=1 and func3=0;
+Use custom extension opcode=0x0B with funct7=2 and funct3=0;
 
 You will need to modify `vx_intrinsics.h` to add your new VX_DOT8 instruction.
 
@@ -99,7 +99,7 @@ Modify the RTL code to implement the custom ISA extension. We recommend checking
 
 ``` verilog
 7'h01: begin
-    case (func3)
+    case (funct3)
         3'h0: begin // DOT8
             ex_type = // TODO: destination functional unit
             op_type = // TODO: instruction type
