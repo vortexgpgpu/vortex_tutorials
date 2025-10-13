@@ -81,7 +81,7 @@ void MatrixMultiply(int8_t A[][N], int8_t B[][N], int32_t C[][N], int N) {
 }
 ```
 
-- Clone sgemmx test under `tests/regression/sgemm` into a new folder `tests/regressions/dot8`.
+- Clone sgemm test under `tests/regression/sgemm` into a new folder `tests/regressions/dot8`.
 - Set PROJECT name to `dot8` in `tests/regressions/dot8/Makefile`
 - Update `matmul_cpu` in `main.cpp` to operate on `int8_t` input matrices and `int32_t` output destination.
 - Ensure `vx_mem_alloc`, `vx_copy_to_dev`, and `vx_copy_from_dev` in `main.cpp` are using the correct size of their buffer in bytes.
