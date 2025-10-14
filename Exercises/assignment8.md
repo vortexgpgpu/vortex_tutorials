@@ -120,6 +120,6 @@ CONFIGS="-DNUM_THREADS=8 -DITYPE=tf32 -DOTYPE=fp32" make -C tests/regression/sge
 CONFIGS="-DNUM_THREADS=8 -DEXT_TCU_ENABLE" ./ci/blackbox.sh --driver=simx --app=sgemm_tcu
 ```
 
-### Step 6 — Benchmark vs. FP16/BF16
+### Step 6 — Benchmark TF32 vs. FP16/BF16
 Using the same kernel and grid settings, measure **instruction counts** and **cycles** for `fp16`, `bf16`, and `tf32` (all accumulating to FP32). Use a 4‑core GPU and try configurations `(warps, threads) ∈ {(4,4), (4,8), (8,4), (8,8)}` with `N = 256` (or similar).
 Plot the total instruction count and execution cycles to observe the performance difference.
