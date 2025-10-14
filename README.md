@@ -62,17 +62,36 @@ There has been increasing interest in developing and accelerating mixed-precisio
 
 ---
 
-## Virgo and Muon: Enabling Scalable Matrix Units and a New ASIC-Focused SIMT Core with Vortex
+## Virgo and Radiance: Enabling Scalable Matrix Units and an SoC-based GPU Platform with Vortex
 **Presenter:** Hansung Kim (UC Berkeley)
 
 ### Abstract
-*Abstract text to be provided.*
+Modern GPUs integrate specialized matrix units like Tensor Cores to accelerate
+deep learning.  However, their tight coupling with SIMT cores limits tensor
+operation size due to register file and bandwidth constraints, hindering both
+scalability and energy efficiency.
+
+To address this limitation, We present Virgo, a GPU microarchitecture that
+integrates matrix units at the SIMT cluster level. By physically disaggregating
+the matrix units from SIMT cores, Virgo supports larger tiles, lowers
+instruction overhead, and improves data reuse and energy efficiency. Leveraging
+the Vortex HW/SW stack, Virgo demonstrates full-system design and evaluation
+for fused kernels such as FlashAttention.
+
+Building on top of Virgo and Vortex, we introduce our recent work on Radiance,
+an ASIC SoC–based GPU platform within Chipyard.  Radiance features the new
+Chisel-based Muon SIMT core which improves PPA via a redesigned issue pipeline,
+dynamic warp occupancy support, and an extended ISA that expands register
+capacity while reducing stack accesses. We discuss tentative plans for
+a silicon tape-out.
 
 ### Bio
 **Hansung Kim**  
-Hansung Kim is a 6th-year Ph.D. student in EECS at UC Berkeley, advised by Prof. Sophia Shao. His work focuses on GPU microarchitecture and
-hardware/software co-design, with strong technical expertise in RTL implementation, GPU kernel development, and SoC integration.  He is currently
-on the job market for industry positions and welcomes opportunities to connect.
+Hansung Kim is a Ph.D. candidate at UC Berkeley, advised by Prof. Sophia
+Shao. His research focuses on GPU microarchitecture and hardware/software
+co-design, with technical expertise in RTL implementation, GPU kernel
+development and SoC integration.  He is currently on the job market for
+industry positions and welcomes opportunities to connect.
 
 
 ---
