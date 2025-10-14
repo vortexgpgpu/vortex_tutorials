@@ -116,6 +116,11 @@ Provided are seven hands-on tutorial assignments covering various aspects of Vor
 ### Remote Access
 A terminal interface hosted by the [CRNCH Rogues Gallery](https://crnch-rg.cc.gatech.edu/) is provided. [Instructions can be found here](./REMOTE_ACCESS.md).
 
+
+### Apptainer
+See the [Apptainer instructions](./apptainer/README.md) for how to set up the apptainer and run simulation for Vortex.
+
+
 ### Docker (Experimental)
 See the [Docker instructions](./docker/README.md) for how to set up a Docker image for Vortex.
 
