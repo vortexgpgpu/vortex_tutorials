@@ -38,7 +38,7 @@ where:
 opcode: opcode reserved for custom instructions.
 funct3 and funct7: opcode modifiers.
 ```
-Use custom extension opcode=0x0B with func7=1 and func3=0;
+Use custom extension opcode=0x0B with func7=9 and func3=0;
 
 You will need to modify `vx_intrinsics.h` to add your new VX_DOT8 instruction.
 
@@ -97,37 +97,35 @@ We recommend checking out how VX_SPLIT and VX_PRED instructions are decoded in S
  - Update `Emulator::decode()` in `decode.cpp` to decode the new instruction format.
 
 ``` c++
-switch (func7) {
-case 1:
-  switch (func3) {
-  case 0:  // DOT8
+case 9: {
+  switch (funct3) {
+  case 0: { // DOT8
+    auto instr = std::allocate_shared<Instr>(instr_pool_, uuid, FUType::ALU);
     instr->setDestReg(rd, RegType::Integer);
-    instr->addSrcReg(rs1, RegType::Integer);
-    instr->addSrcReg(rs2, RegType::Integer);
-    break;
+    instr->setSrcReg(0, rs1, RegType::Integer);
+    instr->setSrcReg(1, rs2, RegType::Integer);
+    instr->setOpType(AluType::DOT8);
+    ibuffer.push_back(instr);
+  } break;
+
+  default:
+    std::abort();
+  }
+} break;
  ```
 
  - Update `AluType` enum in `types.h` to add `DOT8` type
  - Update `Emulator::execute()` in `execute.cpp` to implement the actual `VX_DOT8` emulation. You will execute the new instruction on the ALU functional unit.
 
 ``` c++
-switch (func7) {
-case 1:
-  switch (func3) {
-  case 0: { // DOT8
-      trace->fu_type = FUType::ALU;
-      trace->alu_type = AluType::DOT8;
-      trace->src_regs[0] = {RegType::Integer, rsrc0};
-      trace->src_regs[1] = {RegType::Integer, rsrc1};
-      for (uint32_t t = thread_start; t < num_threads; ++t) {
-        if (!warp.tmask.test(t))
-          continue;
-        // TODO:
-      }
-      rd_write = true;
-    } break;
-  } break;
-}
+case AluType::DOT8: {
+    for (uint32_t t = thread_start; t < num_threads; ++t) {
+      if (!warp.tmask.test(t))
+        continue;
+      // TODO:
+    }
+    rd_write = true;
+} break;
 ```
 
  - Update `AluUnit::tick()` in `func_unit.cpp` to implement the timing of `VX_DOT8`.
