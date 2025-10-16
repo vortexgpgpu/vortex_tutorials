@@ -1,95 +1,121 @@
 # Assignment #3: GPU Software Prefetching (SimX)
 
-## Overview
-This assignment focuses on implementing software prefetching mechanisms in a GPU cache system. You will first add a new prefetch instruction to SimX, then implement performance counters to measure prefetch effectiveness.
+This assignment will be divided into two parts. The first part involves adding a new prefetch instruction as well as a corresponding flag bit to identify if it has been prefetched. The second involves adding three performance counters to measure the following:
 
-## Learning Objectives
-- Learn how to add new instructions to SimX
-- Implement software prefetch instruction in the simulator
-- Design performance counters for prefetch analysis
-- Analyze prefetch effectiveness through simulation
+1. Number of unique prefetch requests to main memory
+2. Number of unused prefetched blocks  
+3. Number of late prefetches
 
----
+All of these counters should be implemented in `cache_sim.h`
 
 ## Part 1: Adding Prefetch Instruction to SimX
 
+To begin, we will add the prefetch instruction in a new group of instructions. Then we want to develop a testing directory and script to ensure correctness and functionality
+
 ### Step 1: Adding Prefetch Intrinsic
 
-First, add the prefetch intrinsic to `runtime/include/vx_intrinsics.h`:
+First, add the prefetch intrinsic to `/kernel/include/vx_intrinsics.h` (right after `vx_barrier()`)
 
 ```c
-// Add this to vx_intrinsics.h
-#define vx_prefetch(addr) \
-    __asm__ volatile (".word 0x7506b" : : "r"(addr) : "memory")
+// Software Prefetch
+inline void vx_prefetch(const void* addr) {
+    __asm__ volatile (".insn r %0, 0, 5, x0, %1, x0" :: "i"(RISCV_CUSTOM0), "r"(addr) : "memory");
+}
 ```
 
-**Key Details:**
-- `0x6b` is the opcode for instructions not defined by RISC-V
-- `5` is the identifier for the prefetch instruction (identifiers 0-4 are already used)
-- The instruction takes only one argument: the load address
+This will create a new group for the prefetch instruction, where this instruction is an R-type instruction format
 
-### Step 2: Implementing in SimX
+### Step 2: Implement into SimX
 
-#### 2a: Decoding in `sim/simx/decode.cpp`
-Add prefetch decoding:
+#### 2a: Editing `types.h`
+
+Before we can decode the instruction, we need to add a new `PREFETCH` value into `LsuType` in the file `/sim/simx/types.h` 
 
 ```cpp
-// In decode.cpp, add case for identifier 5
-case 5: // Software prefetch
-    instr_type = INSTR_PREFETCH;
-    break;
+enum class LsuType {
+  LOAD,
+  STORE,
+  FENCE,
+  PREFETCH  // ADD
+};
 ```
 
-**🔍 Hints for Decoding:**
-- Look for the switch statement handling custom instructions (opcode 0x6b)
-- Find where other custom instructions (tmc, wspawn, split, join, bar) are handled
-- Add the case for identifier 5 in the same switch statement
-
-#### 2b: Executing in `sim/simx/execute.cpp`
-Add prefetch execution:
+We also need a prefetch case for `std::ostream` 
 
 ```cpp
-// In execute.cpp, add case for INSTR_PREFETCH
-case INSTR_PREFETCH:
-    // Print prefetch address for debugging
-    printf("Prefetch address: 0x%x\n", rsdata[0]);
-    break;
+inline std::ostream &operator<<(std::ostream &os, const LsuType& type) {
+  switch (type) {
+  case LsuType::LOAD:     os << "LOAD"; break;
+  case LsuType::STORE:    os << "STORE"; break;
+  case LsuType::FENCE:    os << "FENCE"; break;
+  case LsuType::PREFETCH: os << "PREFETCH"; break;  // ADD
+  default:
+    assert(false);
+  }
+  return os;
+}
 ```
 
-**🔍 Hints for Execution:**
-- Look for the switch statement handling instruction types
-- Find where other instruction types are executed
-- `rsdata[0]` contains the prefetch address from the source register
-- Add debug output to verify prefetch instructions are being executed
+#### 2b: Editing `decode.cpp`
 
-### Step 3: Adding Prefetch Tag in SimX
+We want to update `case Opcode::EXT1:` (in the `/sim/simx/decode.cpp` file) where we add the new prefetch instruction group (right after the `case 2` instruction group)
 
-#### 3a: Adding Prefetch Tag in `sim/simx/VX_lsu_unit.sv`
-Add prefetch bit to the tag before it reaches the cache bank:
-
-```systemverilog
-// In VX_lsu_unit.sv, add prefetch bit to tag
-wire [TAG_WIDTH+1:0] extended_tag;
-assign extended_tag = {core_req_tag, 1'b0, req_is_prefetch};
-
-// Use extended tag for cache requests
-assign cache_req_tag = extended_tag[TAG_WIDTH-1:0];
+```cpp
+case 5: { // SOFTWARE PREFETCH
+	auto instr = std::allocate_shared<Instr>(instr_pool_, uuid, FUType::LSU);
+  switch (funct3) {
+	  case 0: // PREFETCH
+	    instr->setOpType(LsuType::PREFETCH);  // Make sure it is set to PREFETCH
+	    instr->setArgs(IntrLsuArgs{0, 0, 0});
+	    instr->setSrcReg(0, rs1, RegType::Integer);
+	    break;
+    default:
+      std::abort();
+  }
+  ibuffer.push_back(instr);
+} break;
 ```
 
-#### 3b: Adding Prefetch Tag in `sim/simx/VX_cache_bank.sv`
-Add prefetch bit to the debug header:
+In the `op_string()` function, we need to add a `PREFETCH` case (under the `FENCE` case)
 
-```systemverilog
-// In VX_cache_bank.sv, add prefetch bit to debug header
-wire req_is_prefetch = core_req_tag[0]; // Adjust bit position as needed
-
-// Add to debug header
-$write(" [PREFETCH:%d]", req_is_prefetch);
+```cpp
+case LsuType::PREFETCH: return {"PREFETCH", ""};  // ADD
 ```
 
-### Step 4: Creating Test Application
+#### 2c: Editing execute.cpp
 
-#### 4a: Create Prefetch Test
+In order for the instruction to perform a prefetch, we need to add a case for `PREFETCH` in the `execute()` function (in the `/sim/simx/execute.cpp` file)
+
+```cpp
+case LsuType::PREFETCH: {
+    auto trace_data = std::make_shared<LsuTraceData>(num_threads);
+    trace->data = trace_data;
+    
+    for (uint32_t t = thread_start; t < num_threads; ++t) {
+        if (!warp.tmask.test(t))
+            continue;
+        uint64_t prefetch_addr = rs1_data[t].u;
+        
+        // Record the prefetch address in trace
+        trace_data->mem_addrs.at(t) = {prefetch_addr, 4}; // 4 bytes or cache line size
+        
+        // Issue dummy read to populate cache
+        uint32_t dummy;
+        this->dcache_read(&dummy, prefetch_addr, sizeof(uint32_t));
+        
+        DP(2, "PREFETCH: addr=0x" << std::hex << prefetch_addr << std::dec << " (thread " << t << ")");
+    }
+} break;
+```
+
+In this implementation, we issue a dummy read in order to populate a cache. This will trigger SimX to place data (from an address) into cache, essentially prefetching the data. The instruction will not modify or perform anything outside of that.
+
+### Step 3: Creating Test Application
+
+#### 3a: Creating Test Directory
+
+In `/tests/regression/`, we want to duplicate the `fence` folder and rename it to `prefetch` 
+
 ```bash
 # Create prefetch test from fence test
 cp -r tests/regression/fence tests/regression/prefetch
@@ -99,488 +125,517 @@ cd tests/regression/prefetch
 sed -i 's/PROJECT=fence/PROJECT=prefetch/g' Makefile
 ```
 
-#### 4b: Modify kernel.c
-Edit `kernel.c` to add prefetch instructions:
+You should now have the `/tests/regression/prefetch` directory, this will be our testing directory for our new instruction
 
-```c
-// In the main loop of kernel.c, add:
-for (uint32_t i = 0; i < count; ++i) {
-    // ... existing code ...
-    vx_prefetch(src0_ptr + offset + i);  // Add prefetch instruction
-    // ... rest of the loop ...
+**Note:** When cloning, make sure you go into `Makefile` and adjust the project name to `prefetch`
+
+#### 3b: Modify Test Script
+
+We will need to modify `kernel.cpp` (in the testing directory) and add a call to `vx_prefetch()` 
+
+```cpp
+#include <vx_spawn.h>
+#include <vx_intrinsics.h>  // ADD
+#include "common.h"
+
+void kernel_body(kernel_arg_t* __UNIFORM__ arg) {
+	uint32_t count    = arg->task_size;
+	int32_t* src0_ptr = (int32_t*)arg->src0_addr;
+	int32_t* src1_ptr = (int32_t*)arg->src1_addr;
+	int32_t* dst_ptr  = (int32_t*)arg->dst_addr;
+
+	uint32_t offset = blockIdx.x * count;
+	for (uint32_t i = 0; i < count; ++i) {
+		// ADD
+		vx_prefetch(&src0_ptr[offset + i]);
+		vx_prefetch(&src1_ptr[offset + i]);
+		
+		dst_ptr[offset+i] = src0_ptr[offset+i] + src1_ptr[offset+i];
+	}
+
+	vx_fence();
+}
+
+int main() {
+	kernel_arg_t* arg = (kernel_arg_t*)csr_read(VX_CSR_MSCRATCH);
+	return vx_spawn_threads(1, &arg->num_tasks, nullptr, (vx_kernel_func_cb)kernel_body, arg);
 }
 ```
 
-#### 4c: Build and Test
+#### 3c: Building and Testing
+
+To check and see that the new instruction is working, run the following commands in your `/build/` directory
+
+**Note:** Check to see if you ran `source ./ci/toolchain_env.sh` before building!
+
 ```bash
-# Build the test
-make
+# Make the build
+make -s
 
-# Test with SimX
-./ci/blackbox.sh --driver=simx --cores=1 --app=prefetch
+# Run debug to check to see if prefetch output is printed
+./ci/blackbox.sh --driver=simx --cores=1 --app=prefetch --debug=2
 ```
 
-### Step 5: Verifying Prefetch Instructions
-
-#### 5a: Check Kernel Dump
-```bash
-# Look for prefetch opcode in kernel dump
-cat kernel.dump | grep "0x7506b"
-
-# You should see:
-# 800000b0:	0007506b          	0x7506b
-```
-
-#### 5b: Debug Output
-You should see prefetch addresses printed during execution:
-```
-Prefetch address: 0x80001000
-Prefetch address: 0x80001004
-Prefetch address: 0x80001008
-```
-
----
+All output will be in `run.log` in the `/build/` directory, check to see if `DEBUG PREFETCH: …` is present
 
 ## Part 2: Implementing Performance Counters
 
-Now that you have prefetch instructions working in SimX, implement the three performance counters to measure prefetch effectiveness.
+Now that you have prefetch instructions working in SimX, we want to implement the three performance counters to measure prefetch effectiveness
 
-### Overview
-Implement three performance counters in `VX_cache_bank.sv` to measure prefetch effectiveness:
+### Step 1: Adding Prefetch Flags
 
-1. **Unique Prefetch Requests**: Counts first-time prefetch requests to memory
-2. **Unused Prefetched Blocks**: Counts prefetched blocks that were evicted without being used
-3. **Late Prefetches**: Counts prefetch requests that arrive after a demand request for the same address
+#### 1a: Editing `types.h`
 
----
+We want to add the `is_prefetch` flag to `LsuReq` (in the `/sim/simx/types.h` directory)
 
-### 2a: Unique Prefetch Requests Counter
+```cpp
+struct LsuReq {
+  BitVector<> mask;
+  std::vector<uint64_t> addrs;
+  bool     write;
+  uint32_t tag;
+  uint32_t cid;
+  uint64_t uuid;
+  bool     is_prefetch;  // ADD
 
-#### Objective
-Count the number of unique prefetch requests that actually reach main memory (not served by cache hits).
+  LsuReq(uint32_t size)
+    : mask(size)
+    , addrs(size, 0)
+    , write(false)
+    , tag(0)
+    , cid(0)
+    , uuid(0)
+    , is_prefetch(false)  // ADD
+  {}
 
-#### SimX Implementation Details
-- **Signal to Monitor**: Use the `mreq_push` signal in `sim/simx/VX_cache_bank.sv`
-- **Logic**: Increment counter when a prefetch request is pushed to memory (indicating a cache miss)
-- **Filtering**: Only count prefetch requests, not demand requests
-- **Implementation**: SystemVerilog simulation code in SimX
-
-### 🔍 **HINTS FOR PART 2a**
-
-#### Hint 2a.1: Signal Monitoring Location
-- Look for `mreq_push` signal in `sim/simx/VX_cache_bank.sv` - this indicates memory requests
-- You need to filter this signal to only count prefetch requests
-- **Location**: Find where `mreq_push` is used in the cache bank
-
-#### Hint 2a.2: Prefetch Bit Extraction
-```systemverilog
-// Extract prefetch bit from the tag (adjust based on your tag structure)
-wire req_is_prefetch = core_req_tag[0]; // or appropriate bit position
+  friend std::ostream &operator<<(std::ostream &os, const LsuReq& req) {
+    os << "rw=" << req.write << ", mask=" << req.mask << ", addr={";
+    bool first_addr = true;
+    for (size_t i = 0; i < req.mask.size(); ++i) {
+      if (!first_addr) os << ", ";
+      first_addr = false;
+      if (req.mask.test(i)) {
+        os << "0x" << std::hex << req.addrs.at(i) << std::dec;
+      } else {
+        os << "-";
+      }
+    }
+    os << "}, tag=0x" << std::hex << req.tag << std::dec << ", cid=" << req.cid;
+    if (req.is_prefetch) os << ", prefetch=1";  // ADD
+    os << " (#" << req.uuid << ")";
+    return os;
+  }
+};
 ```
 
-**🔍 Key Points:**
-- The prefetch bit should be added to the tag in `sim/simx/VX_lsu_unit.sv` before reaching the cache bank
-- You may need to adjust the bit position based on your tag structure
-- Test with debug output to verify the prefetch bit is correctly extracted
+Similarly, we will add the same flag to `MemReq` 
 
-#### Hint 2a.3: Counter Implementation Pattern
-```systemverilog
-// Counter declaration
-reg [31:0] unique_prefetch_counter;
+```cpp
+struct MemReq {
+  uint64_t addr;
+  bool     write;
+  AddrType type;
+  uint32_t tag;
+  uint32_t cid;
+  uint64_t uuid;
+  bool     is_prefetch;  // ADD
 
-// Filter for prefetch requests only
-wire prefetch_mreq_push = mreq_push && req_is_prefetch;
+  MemReq(uint64_t _addr = 0,
+          bool _write = false,
+          AddrType _type = AddrType::Global,
+          uint64_t _tag = 0,
+          uint32_t _cid = 0,
+          uint64_t _uuid = 0,
+          bool _is_prefetch = false  // ADD
+  ) : addr(_addr)
+    , write(_write)
+    , type(_type)
+    , tag(_tag)
+    , cid(_cid)
+    , uuid(_uuid)
+    , is_prefetch(_is_prefetch)  // ADD
+  {}
 
-// Counter increment logic
-always @(posedge clk) begin
-    if (reset) begin
-        unique_prefetch_counter <= 32'b0;
-    end else if (prefetch_mreq_push) begin
-        unique_prefetch_counter <= unique_prefetch_counter + 1;
-    end
-end
+  friend std::ostream &operator<<(std::ostream &os, const MemReq& req) {
+    os << "rw=" << req.write << ", ";
+    os << "addr=0x" << std::hex << req.addr << std::dec << ", type=" << req.type;
+    os << ", tag=0x" << std::hex << req.tag << std::dec << ", cid=" << req.cid;
+    if (req.is_prefetch) os << ", prefetch=1";  // ADD
+    os << " (#" << req.uuid << ")";
+    return os;
+  }
+};
 ```
 
-**🔍 Implementation Tips:**
-- Add the counter near other performance counters in `sim/simx/VX_cache_bank.sv`
-- Use proper reset logic with the `reset` signal
-- Test with debug output to verify counter increments
+#### 1b: Editing `func_unit.cpp`
 
-#### Key Points
-- Multiple prefetch requests to the same address should only be counted once
-- Cache hits for prefetch requests should not increment the counter
-- Only memory requests (cache misses) should be counted
+We need a way to mark prefetch requests in `LsuUnit::tick()` (in the `/sim/simx/func_unit.cpp` file), so we need to add functionality to our newly added `is_prefetch` flag
 
----
-
-### 2b: Unused Prefetched Blocks Counter
-
-#### Objective
-Track prefetched blocks that are evicted from the cache without ever being accessed by demand requests.
-
-#### Implementation Strategy
-
-##### Step 1: Extend Tag Store
-- Add prefetch bit to the tag store in `VX_tag_access.sv`
-- This bit indicates whether a block was brought in by a prefetch request
-- Update tag store operations to maintain this information
-
-##### Step 2: Usage Tracking Data Structure
-- Add a new data structure in stage 1 of the cache pipeline (data access stage)
-- **Reference**: Look at `VX_Cache_tags.sv` for implementation patterns
-- **Purpose**: Track whether each cache block has been used since being prefetched
-- **Scope**: Universal tracking for every cache block
-
-##### Step 3: Counter Logic
-- **Increment Condition**: When a prefetched block is evicted (fill operation) and was never used
-- **Detection Point**: During fill operations when blocks are evicted from cache
-- **Logic**: Check if block was prefetched AND never accessed by demand request
-
-### 🔍 **HINTS FOR PART 2b**
-
-#### Hint 2b.1: Tag Store Extension
-- In `sim/simx/VX_tag_access.sv`, extend the tag width to include prefetch bit
-- Look for tag store read/write operations and add prefetch bit handling
-
-**🔍 Implementation Details:**
-```systemverilog
-// Extend tag width to include prefetch bit
-localparam TAG_WIDTH_EXT = TAG_WIDTH + 1;
-
-// Modify tag store operations to include prefetch bit
-wire [TAG_WIDTH_EXT-1:0] extended_tag_data;
-assign extended_tag_data = {tag_data, prefetch_bit};
-```
-
-#### Hint 2b.2: Usage Tracking Data Structure
-```systemverilog
-// Add this structure to track block metadata
-typedef struct packed {
-    logic prefetched;
-    logic used;
-} cache_block_metadata_t;
-
-cache_block_metadata_t block_metadata [NUM_WAYS-1:0];
-```
-
-**🔍 Key Points:**
-- This structure tracks metadata for each cache way
-- `prefetched` indicates if the block was brought in by a prefetch
-- `used` indicates if the block has been accessed by a demand request
-- Initialize all metadata to zero on reset
-
-#### Hint 2b.3: Usage Tracking Logic
-```systemverilog
-// Track when blocks are used (on cache hits)
-always @(posedge clk) begin
-    if (core_req_fire && is_hit) begin
-        block_metadata[hit_way].used <= 1'b1;
-    end
-end
-
-// Track when blocks are prefetched (on fill operations)
-always @(posedge clk) begin
-    if (fill_fire && req_is_prefetch) begin
-        block_metadata[fill_way].prefetched <= 1'b1;
-        block_metadata[fill_way].used <= 1'b0;
-    end
-end
-```
-
-#### Hint 2b.4: Counter Logic
-```systemverilog
-// Counter for unused prefetched blocks
-reg [31:0] unused_prefetch_counter;
-
-// Increment when prefetched block is evicted unused
-always @(posedge clk) begin
-    if (reset) begin
-        unused_prefetch_counter <= 32'b0;
-    end else if (evict_fire && block_metadata[evict_way].prefetched && 
-                  !block_metadata[evict_way].used) begin
-        unused_prefetch_counter <= unused_prefetch_counter + 1;
-    end
-end
-```
-
-#### Implementation Steps
-1. Extend tag store with prefetch bit in `VX_tag_access.sv`
-2. Add usage tracking data structure in cache pipeline stage 1
-3. Implement counter logic in fill operation path
-4. Test with prefetch scenarios where blocks are evicted unused
-
----
-
-### 2c: Late Prefetches Counter
-
-#### Objective
-Count prefetch requests that arrive while a demand request for the same address is already pending in the MSHR (Miss Status Holding Register).
-
-#### Implementation Strategy
-
-##### Step 1: MSHR Prefetch Tracking
-- Add a data structure in the MSHR to track prefetch bits for pending requests
-- **Reference**: Study `addr_table` implementation for data structure patterns
-- **Purpose**: Know whether pending MSHR entries are prefetch or demand requests
-
-##### Step 2: Late Prefetch Detection
-- **Reference**: Study `addr_matches` implementation for matching logic
-- **Logic**: Detect when a prefetch request matches a pending demand request address
-- **Counter**: Increment when prefetch arrives after demand request for same address
-
-### 🔍 **HINTS FOR PART 2c**
-
-#### Hint 2c.1: MSHR Data Structure
-```systemverilog
-// Add prefetch bit to MSHR entries
-typedef struct packed {
-    logic [ADDR_WIDTH-1:0] address;
-    logic prefetch;
-    logic valid;
-} mshr_entry_t;
-
-mshr_entry_t mshr_table [MSHR_SIZE-1:0];
-```
-
-**🔍 Implementation Details:**
-- Add this structure to `sim/simx/VX_cache_mshr.sv`
-- `address` stores the memory address being requested
-- `prefetch` indicates if the request is a prefetch
-- `valid` indicates if the MSHR entry is active
-- Update MSHR operations to include prefetch bit when allocating entries
-
-#### Hint 2c.2: Address Matching Logic
-```systemverilog
-// Check for address matches with existing MSHR entries
-wire [MSHR_SIZE-1:0] addr_matches;
-wire [MSHR_SIZE-1:0] prefetch_matches;
-
-for (genvar i = 0; i < MSHR_SIZE; i++) begin : g_addr_matches
-    assign addr_matches[i] = mshr_table[i].valid && 
-                            (mshr_table[i].address == core_req_addr);
-    assign prefetch_matches[i] = addr_matches[i] && mshr_table[i].prefetch;
-end
-```
-
-#### Hint 2c.3: Late Prefetch Detection
-```systemverilog
-// Detect late prefetch: new prefetch request matches existing demand request
-wire late_prefetch_detected = req_is_prefetch && (|addr_matches) && 
-                              !(|prefetch_matches);
-
-// Counter increment logic
-always @(posedge clk) begin
-    if (reset) begin
-        late_prefetch_counter <= 32'b0;
-    end else if (late_prefetch_detected) begin
-        late_prefetch_counter <= late_prefetch_counter + 1;
-    end
-end
-```
-
-#### Implementation Steps
-1. Add prefetch bit tracking to MSHR data structures
-2. Implement address matching logic for late prefetch detection
-3. Add counter increment logic when late prefetch is detected
-4. Test with scenarios where prefetch and demand requests overlap
-
----
-
-## Verification and Testing
-
-### Test Command
-```bash
-# Test with the prefetch regression test
-./ci/blackbox.sh --driver=rtlsim --cores=1 --app=prefetch --perf=1
-
-# Alternative: Test with SimX first
-./ci/blackbox.sh --driver=simx --cores=1 --app=prefetch
-```
-
-### Expected Results
-- **# of unused prefetched blocks = 2**
-- **# of late prefetches = 1**
-
-### 🔍 **Using Prefetch Instructions**
-
-The assignment assumes that prefetch instructions are already available in the system. You can use them in your test applications by:
-
-#### Method 1: Using Existing Prefetch Test
-```bash
-# If a prefetch test exists, use it directly
-cd tests/regression/prefetch/
-./ci/blackbox.sh --driver=rtlsim --cores=1 --app=prefetch --perf=1
-```
-
-#### Method 2: Using Prefetch in Your Own Code
-If you need to create a test that uses prefetch instructions, you can use the prefetch intrinsics in your kernel code:
-
-```c
-// Example usage of prefetch instructions in kernel code
-for (uint32_t i = 0; i < count; ++i) {
-    // Use prefetch to hint cache about upcoming data
-    vx_prefetch(src0_ptr + offset + i);
+```cpp
+void LsuUnit::tick() {
+    // ...
     
-    // Actual computation
-    result[i] = src0_ptr[offset + i] * 2;
+    for (uint32_t iw = 0; iw < ISSUE_WIDTH; ++iw) {
+        // ...
+        
+        bool is_fence = false;
+        bool is_write = false;
+        bool is_prefetch = false;  // ADD
+
+        auto trace = input.front();
+        if (std::get_if<LsuType>(&trace->op_type)) {
+            auto lsu_type = std::get<LsuType>(trace->op_type);
+            is_fence = (lsu_type == LsuType::FENCE);
+            is_write = (lsu_type == LsuType::STORE);
+            is_prefetch = (lsu_type == LsuType::PREFETCH);  // ADD
+        }
+        // ...
+        
+        if (remain_addrs_ != 0) {
+            // setup memory request
+            LsuReq lsu_req(NUM_LSU_LANES);
+            lsu_req.write = is_write;
+            lsu_req.is_prefetch = is_prefetch;  // ADD
+            
+            // ...
+        }
+    }
 }
 ```
 
-### 🔍 **Debugging Prefetch Instructions**
+#### 1c: Editing `cache_sim.cpp`
 
-#### Enable Prefetch Debug Output
-```systemverilog
-`ifdef DBG_PREFETCH
-    always @(posedge clk) begin
-        if (core_req_fire && req_is_prefetch) begin
-            $display("[%0t] Prefetch Request: addr=%h, tag=%h", 
-                     $time, core_req_addr, core_req_tag);
-        end
-    end
-`endif
+To mimic an additional bit on the tag, we also add flag bits to the `line_t` structure (in the `/sim/simx/cache_sim.cpp`), specifically one to check if the data was prefetched and the other if it was used. These two flags will assist the counter with tracking
+
+```cpp
+struct line_t {
+    uint64_t tag;
+    uint32_t lru_ctr;
+    bool     valid;
+    bool     dirty;
+    bool     was_prefetched;  // ADD
+    bool     was_used;        // ADD
+
+    void reset() {
+        valid = false;
+        dirty = false;
+        was_prefetched = false;  // ADD
+        was_used = false;        // ADD
+    }
+};
 ```
 
-#### Monitor Prefetch Counter Values
-```systemverilog
-`ifdef DBG_PREFETCH_COUNTERS
-    always @(posedge clk) begin
-        if (unique_prefetch_counter != 0 || unused_prefetch_counter != 0 || 
-            late_prefetch_counter != 0) begin
-            $display("[%0t] Prefetch Counters: unique=%d, unused=%d, late=%d", 
-                     $time, unique_prefetch_counter, unused_prefetch_counter, 
-                     late_prefetch_counter);
-        end
-    end
-`endif
+Afterwards, we also need to update `bank_req_t` with the prefetch flag
+
+```cpp
+struct bank_req_t {
+    
+    // ...
+    
+    bool     is_prefetch;  // ADD
+
+    bank_req_t() {
+        this->reset();
+    }
+
+    void reset() {
+        type = ReqType::None;
+        is_prefetch = false;  // ADD
+    }
+
+    friend std::ostream &operator<<(std::ostream &os, const bank_req_t& req) {
+        os << "set=" << req.set_id << ", rw=" << req.write;
+        os << ", type=" << req.type;
+        os << ", addr_tag=0x" << std::hex << req.addr_tag;
+        os << ", req_tag=" << req.req_tag;
+        os << ", cid=" << std::dec << req.cid;
+        if (req.is_prefetch) os << ", prefetch=1";  // ADD
+        os << " (#" << req.uuid << ")";
+        return os;
+    }
+};
 ```
 
-### 🔍 **Common Issues and Solutions**
+Now that we have the flags set in `cache_sim.cpp`, we want to implement logic into the `processInputs()` function
 
-#### Issue 1: Prefetch Bit Not Propagating
-**Problem**: Prefetch bit not reaching the cache bank
-**Solution**: 
-- Check that prefetch bit is added to tag in `VX_lsu_unit.sv`
-- Verify tag extension before truncation occurs
-- Add debug output to trace prefetch bit propagation
+```cpp
+void processInputs() {
+    // ...
+    
+    // second: schedule memory fill
+		if (!this->mem_rsp_port.empty()) {
+			auto& mem_rsp = mem_rsp_port.front();
+			DT(3, this->name() << "-fill-rsp: " << mem_rsp);
+			// update MSHR
+			auto& entry = mshr_.replay(mem_rsp.tag);
+			auto& set   = sets_.at(entry.bank_req.set_id);
+			auto& line  = set.lines.at(entry.line_id);
+			line.valid  = true;
+			line.tag    = entry.bank_req.addr_tag;
+			line.was_prefetched = entry.bank_req.is_prefetch;  // ADD
+    	
+    	// ...
+		}
+    
+    // third: schedule core request
+    if (!this->core_req_port.empty()) {
+      auto& core_req = core_req_port.front();
+        
+      // ...
+        
+      bank_req.type = bank_req_t::Core;
+      bank_req.cid = core_req.cid;
+      bank_req.uuid = core_req.uuid;
+      bank_req.set_id = params_.addr_set_id(core_req.addr);
+      bank_req.addr_tag = params_.addr_tag(core_req.addr);
+      bank_req.req_tag = core_req.tag;
+      bank_req.write = core_req.write;
+      bank_req.is_prefetch = core_req.is_prefetch;  // ADD
+        
+      // ...
+    }
+}
+```
 
-#### Issue 2: Counters Not Incrementing
-**Problem**: Performance counters remain at zero
-**Solution**:
-- Verify signal filtering logic (prefetch vs demand requests)
-- Check counter increment conditions
-- Add debug output to monitor counter logic
+#### 1d: Editing `types.cpp`
 
-#### Issue 3: Wrong Counter Values
-**Problem**: Counter values don't match expected results
-**Solution**:
-- Verify each counter's specific logic
-- Check timing of counter increments
-- Test with simple, predictable prefetch patterns
+Now we want to propagate `is_prefetch` through `LsuMemAdapter` (in the `/sim/simx/types.cpp` file) so that the counter can see the flag
 
-#### Issue 4: Compilation Errors
-**Problem**: SystemVerilog compilation fails
-**Solution**:
-- Check syntax for typedef declarations
-- Verify signal names and bit widths
-- Ensure proper reset logic for all counters
+```cpp
+// process incoming requests
+  if (!ReqIn.empty()) {
+    auto& in_req = ReqIn.front();
+    assert(in_req.mask.size() == input_size);
+    for (uint32_t i = 0; i < input_size; ++i) {
+      if (in_req.mask.test(i)) {
+        // build memory request
+        MemReq out_req;
+        out_req.write = in_req.write;
+        out_req.addr  = in_req.addrs.at(i);
+        out_req.is_prefetch = in_req.is_prefetch; // ADD
+        out_req.type  = get_addr_type(in_req.addrs.at(i));
+        out_req.tag   = in_req.tag;
+        out_req.cid   = in_req.cid;
+        out_req.uuid  = in_req.uuid;
+        // send memory request
+        ReqOut.at(i).push(out_req, delay_);
+        DT(4, this->name() << "-req" << i << ": " << out_req);
+      }
+    }
+    ReqIn.pop();
+  }
+```
 
-### Verification Strategy
-1. **Unit Testing**: Test each counter individually with controlled scenarios
-2. **Integration Testing**: Run full prefetch application with performance monitoring
-3. **Result Validation**: Compare counter values with expected results
-4. **Edge Cases**: Test boundary conditions and error scenarios
+### Step 2: Adding Counters
 
----
+We want to add all three prefetch counters into the `PerfStats` structure (in the `/sim/simx/cache_sim.h` file)
 
-## Implementation Tips
+```cpp
+struct PerfStats {
+    uint64_t reads;
+    uint64_t writes;
+    uint64_t read_misses;
+    uint64_t write_misses;
+    uint64_t evictions;
+    uint64_t bank_stalls;
+    uint64_t mshr_stalls;
+    uint64_t mem_latency;
+    
+    uint64_t prefetch_requests;  // ADD
+    uint64_t prefetch_unused;    // ADD
+    uint64_t prefetch_late;      // ADD
 
-### Code Organization
-- Keep counter logic centralized in `VX_cache_bank.sv`
-- Use consistent naming conventions for new signals and variables
-- Add comprehensive comments explaining counter logic
+    PerfStats()
+        : reads(0)
+        , writes(0)
+        , read_misses(0)
+        , write_misses(0)
+        , evictions(0)
+        , bank_stalls(0)
+        , mshr_stalls(0)
+        , mem_latency(0)
+        , prefetch_requests(0)   // ADD
+        , prefetch_unused(0)     // ADD
+        , prefetch_late(0)       // ADD
+    {}
 
-### Debugging
-- Use debug headers to verify prefetch bit propagation
-- Add temporary debug output for counter values during development
-- Test with simple, predictable prefetch patterns first
+    PerfStats& operator+=(const PerfStats& rhs) {
+        this->reads += rhs.reads;
+        this->writes += rhs.writes;
+        this->read_misses += rhs.read_misses;
+        this->write_misses += rhs.write_misses;
+        this->evictions += rhs.evictions;
+        this->bank_stalls += rhs.bank_stalls;
+        this->mshr_stalls += rhs.mshr_stalls;
+        this->mem_latency += rhs.mem_latency;
+        this->prefetch_requests += rhs.prefetch_requests;  // ADD
+        this->prefetch_unused += rhs.prefetch_unused;      // ADD
+        this->prefetch_late += rhs.prefetch_late;          // ADD
+        return *this;
+    }
+};
+```
 
-### Performance Considerations
-- Ensure counter updates don't impact cache performance
-- Use efficient data structures for tracking
-- Minimize additional logic in critical cache paths
+To implement functionality, we add counter logic in the `processRequests()` function (in the `/sim/simx/cache_sim.cpp` file)
 
----
+```cpp
+void processRequests() {
+    if (pipe_req_->empty())
+        return;
+    auto bank_req = pipe_req_->front();
 
-## Deliverables
+    switch (bank_req.type) {
+    
+    // ...
 
-1. **Modified Files**:
-   - `runtime/include/vx_intrinsics.h` (prefetch intrinsic)
-   - `sim/simx/decode.cpp` (prefetch decoding)
-   - `sim/simx/execute.cpp` (prefetch execution)
-   - `VX_cache_bank.sv` (performance counters)
-   - `VX_tag_access.sv` (tag store extension)
-   - Any additional files with MSHR modifications
+    case bank_req_t::Core: {
+        
+        // ...
+        
+        if (hit_line_id != -1) {
+        
+            // ...
+            
+        } else {
+            // MISS
+            if (bank_req.write && !bank_req.is_prefetch) {
+                ++perf_stats_.write_misses;
+            } else if (!bank_req.is_prefetch) {
+                ++perf_stats_.read_misses;
+            }
+            
+            // Counter 1: Count unique prefetch requests that miss
+            if (bank_req.is_prefetch) {
+                ++perf_stats_.prefetch_requests;
+            }
 
-2. **Verification**:
-   - Successful compilation
-   - Correct counter values for test case
-   - Debug output showing prefetch bit
+            // Check if there's already a pending MSHR for this address
+            auto mshr_pending = mshr_.lookup(bank_req);
+            
+            // Counter 3: Late prefetch (demand arrives while prefetch in MSHR)
+            if (!bank_req.is_prefetch && mshr_pending) {
+                ++perf_stats_.prefetch_late;
+            }
 
-3. **Documentation**:
-   - Comments explaining counter logic
-   - Brief description of implementation approach
-   - Any assumptions or design decisions made
+            if (free_line_id == -1 && config_.write_back) {
+                // write back dirty line
+                auto& repl_line = set.lines.at(repl_line_id);
+                
+                // Counter 2: Unused prefetch (evicting prefetched but unused line)
+                if (repl_line.was_prefetched && !repl_line.was_used) {
+                    ++perf_stats_.prefetch_unused;
+                }
+                
+                if (repl_line.dirty) {
+                    MemReq mem_req;
+                    mem_req.addr  = params_.mem_addr(bank_id_, bank_req.set_id, repl_line.tag);
+                    mem_req.write = true;
+                    mem_req.cid   = bank_req.cid;
+                    this->mem_req_port.push(mem_req);
+                    DT(3, this->name() << "-writeback: " << mem_req);
+                    ++perf_stats_.evictions;
+                }
+            }
 
----
+            // ...
+        }
+    } break;
+    
+    // ...
+}
+```
 
-## 🎯 **QUICK IMPLEMENTATION CHECKLIST**
+### Step 3: Printing Results
 
-### Part 1: SimX Implementation
-- [ ] Add prefetch intrinsic to `vx_intrinsics.h`
-- [ ] Add prefetch decoding in `decode.cpp`
-- [ ] Add prefetch execution in `execute.cpp`
-- [ ] Create prefetch test application
-- [ ] Test with SimX and verify debug output
+#### 3a: Editing `VX_types.vh`
 
-### Part 2a: Unique Prefetch Counter
-- [ ] Monitor `mreq_push` signal
-- [ ] Filter for prefetch requests only
-- [ ] Implement counter increment logic
+In order to print the results, we first need to add three new CSR definitions into `VX_types.vh` (in the `/hw/rtl/` directory)
 
-### Part 2b: Unused Prefetched Blocks Counter
-- [ ] Extend tag store in `VX_tag_access.sv`
-- [ ] Add usage tracking data structure
-- [ ] Track block usage on cache hits
-- [ ] Track block prefetch status on fills
-- [ ] Implement counter logic on eviction
+**Note:** Despite this assignment focusing on SimX (C++), we are editing a `*.vh` file. This file creates a `VX_types.h` file that's in the `/build/hw/` directory (after making the build)
 
-### Part 2c: Late Prefetches Counter
-- [ ] Add prefetch bit to MSHR entries
-- [ ] Implement address matching logic
-- [ ] Detect late prefetch conditions
-- [ ] Implement counter increment logic
+```verilog
+`define VX_CSR_MPM_PREFETCH_REQ     12'hB20     // unique prefetch requests
+`define VX_CSR_MPM_PREFETCH_REQ_H   12'hBA0
+`define VX_CSR_MPM_PREFETCH_UNUSED  12'hB21     // unused prefetches
+`define VX_CSR_MPM_PREFETCH_UNUSED_H 12'hBA1
+`define VX_CSR_MPM_PREFETCH_LATE    12'hB22     // late prefetches
+`define VX_CSR_MPM_PREFETCH_LATE_H  12'hBA2
+```
 
-### Verification
-- [ ] Run test command and verify expected results
-- [ ] Add debug output for troubleshooting
-- [ ] Test edge cases and boundary conditions
+#### 3b: Editing `utils.cpp`
 
----
+To have `PERF: …` line at the end of the test, we need to add output logic within the `dcache_enable` if statement (in the `/runtime/stub/utils.cpp` file) with our newly added counters
 
-## Assignment 3 vs Assignment 4 Summary
+```cpp
+// ...
 
-| **Aspect** | **Assignment 3 (SimX)** | **Assignment 4 (RTL)** |
-|------------|-------------------------|------------------------|
-| **Implementation** | C++ software simulation | SystemVerilog hardware |
-| **File Paths** | `sim/simx/` | `hw/rtl/` |
-| **Counters** | Software variables | Hardware registers |
-| **Timing** | Cycle-accurate simulation | Real hardware timing |
-| **Debugging** | `printf` statements | `$display` statements |
-| **Synthesis** | Not synthesizable | Synthesizable to hardware |
-| **Purpose** | Simulation and testing | Hardware implementation |
+// PERF: Prefetch counters
+uint64_t prefetch_requests;
+CHECK_ERR(vx_mpm_query(hdevice, VX_CSR_MPM_PREFETCH_REQ, core_id, &prefetch_requests), {
+return err;
+});
+uint64_t prefetch_unused;
+CHECK_ERR(vx_mpm_query(hdevice, VX_CSR_MPM_PREFETCH_UNUSED, core_id, &prefetch_unused), {
+return err;
+});
+uint64_t prefetch_late;
+CHECK_ERR(vx_mpm_query(hdevice, VX_CSR_MPM_PREFETCH_LATE, core_id, &prefetch_late), {
+return err;
+});
+fprintf(stream, "PERF: core%d: dcache prefetch requests=%ld\n", core_id, prefetch_requests);
+fprintf(stream, "PERF: core%d: dcache prefetch unused=%ld\n", core_id, prefetch_unused);
+fprintf(stream, "PERF: core%d: dcache prefetch late=%ld\n", core_id, prefetch_late);
 
-**Prerequisites**: Assignment 3 must be completed before Assignment 4.
+// ...
+```
 
----
+#### 3c: Editing `emulator.cpp`
 
-*This document was created with assistance from Claude, an AI assistant, to provide comprehensive guidance for implementing GPU software prefetching in SimX simulation.*
+Because our addresses are extended outside of the CSR address range, we need to expand it from 32 to 64 bits in the `user-defined MPM CSRs` section (in the `/sim/simx/emulator.cpp` directory)
+
+```cpp
+// ...
+
+if ((addr >= VX_CSR_MPM_BASE && addr < (VX_CSR_MPM_BASE + 64)) // CHANGE
+ || (addr >= VX_CSR_MPM_BASE_H && addr < (VX_CSR_MPM_BASE_H + 64)))
+ 
+// ...
+```
+
+#### 3d: Editing `vortex.cpp`
+
+Similarly, we need to edit the `mpm_query()` function to support an extended address range (in the `/runtime/simx/vortex.cpp` file)
+
+```cpp
+// ...
+
+int mpm_query(uint32_t addr, uint32_t core_id, uint64_t *value) {
+  uint32_t offset = addr - VX_CSR_MPM_BASE;
+  if (offset > 63)  // CHANGE 1
+    return -1;
+  if (mpm_cache_.count(core_id) == 0) {
+    uint64_t mpm_mem_addr = IO_MPM_ADDR + core_id * 64 * sizeof(uint64_t);  // CHANGE 2
+    CHECK_ERR(this->download(mpm_cache_[core_id].data(), mpm_mem_addr, 64 * sizeof(uint64_t)), {  // CHANGE 3
+      return err;
+    });
+  }
+  *value = mpm_cache_.at(core_id).at(offset);
+  return 0;
+}
+
+// ...
+```
+
+## Verification and Testing:
+
+To test your changes, you can run the following to build and verify prefetch functionality
+
+```bash
+# Make the build
+make -s
+
+# Test with SimX
+./ci/blackbox.sh --driver=simx --cores=1 --app=prefetch --perf=2
+```
+
+The expected result is a test passed message and an output of all 3 metric counters, feel free to change `kernel.cpp` with different instruction/data sizes to observe prefetch efficiency
