@@ -568,7 +568,7 @@ void processRequests() {
             auto& hit_line = set.lines.at(hit_line_id);
 		
             // ADD: Mark as used if it was prefetched
-            if (hit_line.was_prefetched && bank_req.is_prefetch) {
+            if (hit_line.was_prefetched && !bank_req.is_prefetch) {
                 hit_line.was_used = true;
             }
 			
