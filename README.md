@@ -18,17 +18,86 @@ Chihyo (Mark) Ahn (Georgia Institute of Technology)
 
 Shinnung Jeong (Georgia Institute of Technology)
 
-## Tentative Tutorial Schedule
+## Tentative Tutorial and Workshop Schedule
 
 | Time        | Contents                                    | Presenter         | slides |
 |-------------|---------------------------------------------|-------------------|--------|
-| 8:00-8:20   | Intro and GPU background                    | Hyesoon Kim       |  |
-| 8:20-9:20   | Vortex Microarchitecture and Software Stack | Blaise Tine       | | 
-| 9:20-9:40   | CuPBoP: Running OpenCL and CUDA on Vortex   | Chihyo (Mark) Ahn | ||
-| 9:40-10:00  | Q&A Session                                 |                   |        |
-| 10:00-10:20 | Coffee Break                                |                   |        |
-| 10:20-11:00 | Vortex Software |   |   | 
-| 11:00-12:00 | Vortex Workshop             |                   |        |
+| 8:00-8:10   | Intro and GPU background                    | Hyesoon Kim       |  |
+| 8:10-9:10   | Vortex Microarchitecture and Software Stack | Blaise Tine       | | 
+| 9:10-9:25   | Vortex Compiler and running OpenCL          | Shinnung Jeong       | | 
+| 9:25-9:40   | CuPBoP: Running  CUDA on Vortex   | Chihyo (Mark) Ahn | ||
+| 9:40-10:00  | Vortex Tutorial Assignment                           |                   |        |
+| 10:00-10:30 | Q&A and Coffee Break                                |                   |        |
+| 10:30-11:40 | Vortex Workshop 
+| 11:40-12:00 | Review of Tutorial Assignments              |                   |        |
+
+
+# Vortex Workshop Info
+
+---
+
+## Portable Vortex HDL for FPGA and ASIC Technologies  
+**Presenters:** Jamie Kelly (enVention, LLC) and Scott O’Malia (enVention, LLC)
+
+### Abstract
+In this work, we analyze the open-source Vortex GPGPU HDL source code for portability between FPGA and ASIC target technologies. Beyond coding HDL source for legal RTL synthesis, several architecture aspects should be considered to ease technology retargeting without significant HDL source changes. Clock and reset trees and fanout control can be planned at the HDL level. Required sync and async reset types can vary with target technology, warranting a generic, global method to automatically handle each case. Special handling of clock and reset domain crossings may be required. Well-planned design hierarchy can aid floorplanning for back-end tools. Technology-specific leaf cells, such as static RAMs and arithmetic multipliers, should be wrapped using a common interface and parameter set. RAM wrappers can contain special reset control state machines to directly initialize RAM contents for many ASIC technologies that do not support this function. HDL logic pipelining and technology timing closure rely heavily on the use of flip-flop cells for delay. FPGA and ASIC flip-flop area costs are quite different, especially when complex scan-style cells are needed for ASIC manufacturing testing. The ratio of combinatorial look-up tables to flip-flops is examined. The Vortex GPGPU HDL source is analyzed for each of these cited aspects, and the results and suggested improvements are presented in this paper.
+
+### Bios
+**Jamie Kelly**  
+Jamie Kelly (MS EE ‘97, MS Physics ‘07) has worked in hardware, software, FPGA, and ASIC development for more than 25 years. He has expertise in telecommunications/networking, packet switching/queuing, Linux kernel/device drivers, and end-to-end FPGA/ASIC design. Jamie currently serves as the Director of Hardware Engineering at enVention, LLC in Huntsville, Alabama, USA.
+
+**Scott O’Malia**  
+Scott O'Malia (BS MET ’09, BS EE ’13) is an Electrical Engineer at enVention, LLC with over 10 years of experience in FPGA verification, embedded systems, and safety-critical hardware/software design. His expertise includes HDL development and verification, applying DO-178/DO-254 rigor for flight-critical applications, and advancing vendor-independent FPGA verification solutions for long-term sustainment.
+
+---
+
+## A Configurable Mixed-Precision Fused Dot Product Unit for GPGPU Tensor Computation  
+**Presenters:** Nikhil Rout (Vellore Institute of Technology) and Blaise Tine (UCLA)
+
+Nikhil Rout is a 4th-year undergraduate student in ECE at the Vellore Institute of Technology, Chennai. He has been a research intern with the Vortex GPGPU group since summer 2025, advised by Prof. Blaise Tine. His research interests lie in GPGPUs and DNN accelerators at the microarchitecture abstraction level.
+
+
+### Abstract
+There has been increasing interest in developing and accelerating mixed-precision Matrix-Multiply-Accumulate operations in GPGPUs for Deep Learning workloads. However, existing open-source RTL implementations of inner dot product units rely on discrete arithmetic units, leading to suboptimal throughput and poor resource utilization. To address these challenges, we propose a scalable mixed-precision dot product unit that integrates floating-point and integer arithmetic pipelines within a singular fused architecture, implemented as part of the open-source RISC-V based Vortex GPGPU’s Tensor Core Unit extension. Our design supports low-precision multiplication in FP16/BF16/FP8/BF8/INT8/UINT4 formats and higher-precision accumulation in FP32/INT32, with an extensible framework for adding and evaluating other custom representations in the future. Experimental results demonstrate 4-cycle operation latency at 362.2 MHz clock frequency on the AMD Xilinx Alveo U55C FPGA, delivering an ideal filled pipeline throughput of 11.948 GFlops in a 4-thread configuration.
+
+---
+
+## Virgo and Radiance: Enabling Scalable Matrix Units and an SoC-based GPU Platform with Vortex
+**Presenter:** Hansung Kim (UC Berkeley)
+
+### Abstract
+Modern GPUs integrate specialized matrix units like Tensor Cores to accelerate
+deep learning.  However, their tight coupling with SIMT cores limits tensor
+operation size due to register file and bandwidth constraints, hindering both
+scalability and energy efficiency.
+
+To address this limitation, We present Virgo, a GPU microarchitecture that
+integrates matrix units at the SIMT cluster level. By physically disaggregating
+the matrix units from SIMT cores, Virgo supports larger tiles, lowers
+instruction overhead, and improves data reuse and energy efficiency. Leveraging
+the Vortex HW/SW stack, Virgo demonstrates full-system design and evaluation
+for fused kernels such as FlashAttention.
+
+Building on top of Virgo and Vortex, we introduce our recent work on Radiance,
+an ASIC SoC–based GPU platform within Chipyard.  Radiance features the new
+Chisel-based Muon SIMT core which improves PPA via a redesigned issue pipeline,
+dynamic warp occupancy support, and an extended ISA that expands register
+capacity while reducing stack accesses. We discuss tentative plans for
+a silicon tape-out.
+
+### Bio
+**Hansung Kim**  
+Hansung Kim is a Ph.D. candidate at UC Berkeley, advised by Prof. Sophia
+Shao. His research focuses on GPU microarchitecture and hardware/software
+co-design, with technical expertise in RTL implementation, GPU kernel
+development and SoC integration.  He is currently on the job market for
+industry positions and welcomes opportunities to connect.
+
+
+---
+
+
+
 
 ## Tutorial Assignments
 
@@ -47,6 +116,11 @@ Provided are seven hands-on tutorial assignments covering various aspects of Vor
 ### Remote Access
 A terminal interface hosted by the [CRNCH Rogues Gallery](https://crnch-rg.cc.gatech.edu/) is provided. [Instructions can be found here](./REMOTE_ACCESS.md).
 
+
+### Apptainer
+See the [Apptainer instructions](./apptainer/README.md) for how to set up the apptainer and run simulation for Vortex.
+
+
 ### Docker (Experimental)
 See the [Docker instructions](./docker/README.md) for how to set up a Docker image for Vortex.
 
@@ -56,7 +130,10 @@ If you would like to set up Vortex on your own system, [instructions can be foun
 ## Relevant Repos
 
 * [Vortex](https://github.com/vortexgpgpu/vortex)
+* 
 * [Vortex Toolchain](https://github.com/vortexgpgpu/vortex-toolchain-prebuilt)
+
+* [Cupbop on Vortex] (https://github.com/cupbop/CuPBoP_Vortex)
 
 ## Mailing list
 For tutorial info please join  https://docs.google.com/forms/d/1r8E-Yo5NwA45Hi3-kEwte4AxK0mBsYDwgjM6Bul4so0/edit
