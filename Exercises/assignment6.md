@@ -3,6 +3,7 @@
 This assignment will introduce you to the basics of extending GPU Microarchitecture to accelerate a kernel in hardware
 You will add a new RISC-V custom instruction for computing the integer dot product: VX\_DOT8.
 You will also implement this instruction in the hardware RTL.
+Prerequisite: We recommend completing the prior assignment on the Dot8 simulation before this one.
 
 ### Step 1: ISA Extension
 
@@ -38,7 +39,7 @@ where:
 opcode: opcode reserved for custom instructions.
 funct3 and funct7: opcode modifiers.
 ```
-Use custom extension opcode=0x0B with func7=1 and func3=0;
+Use custom extension opcode=0x0B with funct7=3 and funct3=0;
 
 You will need to modify `vx_intrinsics.h` to add your new VX_DOT8 instruction.
 
@@ -69,7 +70,7 @@ void MatrixMultiply(int8_t A[][N], int8_t B[][N], int32_t C[][N], int N) {
       for (int k = 0; k < N; k += 4) {
         // Pack 4 int8_t elements from A and B into 32-bit integers
         uint32_t packedA = *((int*)(A[i] + k));
-        uint32_t packedB = (uint8_t)B[k][j]
+        uint32_t packedB = ((uint8_t)B[k+0][j] << 0)
                          | ((uint8_t)B[k+1][j] << 8)
                          | ((uint8_t)B[k+2][j] << 16)
                          | ((uint8_t)B[k+3][j] << 24);
@@ -79,31 +80,32 @@ void MatrixMultiply(int8_t A[][N], int8_t B[][N], int32_t C[][N], int N) {
     }
   }
 }
-
 ```
 
-- Clone sgemmx test under https://github.com/vortexgpgpu/vortex/blob/master/tests/regression/sgemmx into a new folder `tests/regressions/dot8`.
-
+- Clone sgemm test under `tests/regression/sgemm` into a new folder `tests/regressions/dot8`.
 - Set PROJECT name to `dot8` in `tests/regressions/dot8/Makefile`
-- Update `matmul_cpu` in main.cpp to operate on `int8_t` matrices.
-- Update `kernel_body` in `tests/regressions/dot8/kernel.cpp` to use `vx_dot8`
+- Update `matmul_cpu` in `main.cpp` to operate on `int8_t` input matrices and `int32_t` output destination.
+- Ensure `vx_mem_alloc`, `vx_copy_to_dev`, and `vx_copy_from_dev` in `main.cpp` are using the correct size of their buffer in bytes.
+- Update `kernel_body` in `tests/regressions/dot8/kernel.cpp` to use `vx_dot8` intrinsic function.
 
 ### Step 3: Hardware RTL implementation
 
-Modify the RTL code to implement the custom ISA extension. We recommend checking out how MULT instructions are decoded and executed in RTL as reference.
+Modify the RTL code to implement the custom ISA extension. We recommend checking out how MULT instructions are decoded and executed in RTL as a reference.
 
-- Update `hw/rtl/VX_define.vh` to define `INST_ALU_DOT8` as `4'b0001`
+- Update `hw/rtl/VX_gpu_pkg.vh` to replace `INST_ALU_UNUSED` with `INST_ALU_DOT8`
 - Update `hw/rtl/VX_config.vh` to define `LATENCY_DOT8` as 2
-- Update `dpi_trace()` in `hw/rtl/VX_gpu_pkg.sv` to print the new instruction
+- Update `hw/rtl/VX_trace_pkg.vh` to include "DOT8" trace
 - Update `hw/rtl/core/VX_decode.sv` to decode the new instruction. Select the ALU functional unit for executing this new instruction.
 
 ``` verilog
-7'h01: begin
-    case (func3)
+7'h03: begin
+    case (funct3)
         3'h0: begin // DOT8
             ex_type = // TODO: destination functional unit
-            op_type = // TODO: instruction type
-            use_rd =  // TODO: writing back to rd
+            op_type = // TODO: DOT8 instruction type
+            op_args.alu = '0;
+            op_args.alu.xtype = // TODO: arithmetic ALU
+            use_rd = // TODO: this instruction does writeback 
             // TODO: set using rd
             // TODO: set using rs1
             // TODO: set using rs2
@@ -117,7 +119,7 @@ end
 ``` verilog
 `include "VX_define.vh"
 
-module VX_alu_dot8 #(
+module VX_alu_dot8 import VX_gpu_pkg::*; #(
     parameter `STRING INSTANCE_ID = "",
     parameter NUM_LANES = 1
 ) (
@@ -128,37 +130,36 @@ module VX_alu_dot8 #(
     VX_execute_if.slave execute_if,
 
     // Outputs
-    VX_commit_if.master commit_if
+    VX_result_if.master result_if
 );
     `UNUSED_SPARAM (INSTANCE_ID)
     localparam PID_BITS = `CLOG2(`NUM_THREADS / NUM_LANES);
     localparam PID_WIDTH = `UP(PID_BITS);
-    localparam TAG_WIDTH = `UUID_WIDTH + `NW_WIDTH + NUM_LANES + `PC_BITS + `NR_BITS + 1 + PID_WIDTH + 1 + 1;
+    localparam TAG_WIDTH = UUID_WIDTH + NW_WIDTH + NUM_LANES + PC_BITS + 1 + NUM_REGS_BITS + PID_WIDTH + 1 + 1;
     localparam LATENCY_DOT8 = `LATENCY_DOT8;
-    localparam PE_RATIO = 2;
+    localparam PE_RATIO = 1;
     localparam NUM_PES = `UP(NUM_LANES / PE_RATIO);
 
     `UNUSED_VAR (execute_if.data.op_type)
-    `UNUSED_VAR (execute_if.data.tid)
+    `UNUSED_VAR (execute_if.data.op_args)
     `UNUSED_VAR (execute_if.data.rs3_data)
 
+    wire pe_enable;
     wire [NUM_LANES-1:0][2*`XLEN-1:0] data_in;
+    wire [NUM_PES-1:0][2*`XLEN-1:0] pe_data_in;
+    wire [NUM_PES-1:0][`XLEN-1:0] pe_data_out;
 
-    for (genvar i = 0; i < NUM_LANES; ++i) begin
+    for (genvar i = 0; i < NUM_LANES; ++i) begin : g_data_in
         assign data_in[i][0 +: `XLEN] = execute_if.data.rs1_data[i];
         assign data_in[i][`XLEN +: `XLEN] = execute_if.data.rs2_data[i];
     end
-
-    wire pe_enable;
-    wire [NUM_PES-1:0][2*`XLEN-1:0] pe_data_in;
-    wire [NUM_PES-1:0][`XLEN-1:0] pe_data_out;
 
     // PEs time-multiplexing
     VX_pe_serializer #(
         .NUM_LANES  (NUM_LANES),
         .NUM_PES    (NUM_PES),
         .LATENCY    (LATENCY_DOT8),
-        .DATA_IN_WIDTH (2*`XLEN),
+        .DATA_IN_WIDTH (2 * `XLEN),
         .DATA_OUT_WIDTH (`XLEN),
         .TAG_WIDTH  (TAG_WIDTH),
         .PE_REG     (1)
@@ -172,8 +173,8 @@ module VX_alu_dot8 #(
             execute_if.data.wid,
             execute_if.data.tmask,
             execute_if.data.PC,
-            execute_if.data.rd,
             execute_if.data.wb,
+            execute_if.data.rd,
             execute_if.data.pid,
             execute_if.data.sop,
             execute_if.data.eop
@@ -182,30 +183,40 @@ module VX_alu_dot8 #(
         .pe_enable  (pe_enable),
         .pe_data_in (pe_data_out),
         .pe_data_out(pe_data_in),
-        .valid_out  (commit_if.valid),
-        .data_out   (commit_if.data.data),
+        .valid_out  (result_if.valid),
+        .data_out   (result_if.data.data),
         .tag_out    ({
-            commit_if.data.uuid,
-            commit_if.data.wid,
-            commit_if.data.tmask,
-            commit_if.data.PC,
-            commit_if.data.rd,
-            commit_if.data.wb,
-            commit_if.data.pid,
-            commit_if.data.sop,
-            commit_if.data.eop
+            result_if.data.uuid,
+            result_if.data.wid,
+            result_if.data.tmask,
+            result_if.data.PC,
+            result_if.data.wb,
+            result_if.data.rd,
+            result_if.data.pid,
+            result_if.data.sop,
+            result_if.data.eop
         }),
-        .ready_out  (commit_if.ready)
+        .ready_out  (result_if.ready)
     );
 
     // PEs instancing
-    for (genvar i = 0; i < NUM_PES; ++i) begin
-        wire [XLEN-1:0] a = pe_data_in[i][0 +: XLEN];
-        wire [XLEN-1:0] b = pe_data_in[i][XLEN +: XLEN];
-        // TODO:
-        wire [31:0] result;
-        `BUFFER_EX(result, c, pe_enable, 1, LATENCY_DOT8); // c is the result of the dot product
+    for (genvar i = 0; i < NUM_PES; ++i) begin : g_PEs
+        wire [`XLEN-1:0] a = pe_data_in[i][0 +: `XLEN];
+        wire [`XLEN-1:0] b = pe_data_in[i][`XLEN +: `XLEN];
+        wire [31:0] c, result;
+
+        // TODO: calculate c
+
+        `BUFFER_EX(result, c, pe_enable, 1, LATENCY_DOT8);
         assign pe_data_out[i] = `XLEN'(result);
+
+    `ifdef DBG_TRACE_PIPELINE
+        always @(posedge clk) begin
+            if (pe_enable) begin
+                `TRACE(2, ("%t: %s dot8[%0d]: a=0%0h, b=0x%0h, c=0x%0h\n", $time, INSTANCE_ID, i, a, b, c))
+            end
+        end
+    `endif
     end
 
 endmodule
@@ -215,6 +226,6 @@ endmodule
 
 ### Step 4: Testing
 
-You will compare your new accelerated dot8 program with the existing sgemmx kernel under the regression codebase.
-You will use N=128 and (warps=4, threads=4) and (Warps=16, threads=16) for 1 and 4 cores.
-Plot the total execution cycles to observe the performance improvement.
+You will compare your new accelerated dot8 program with a corresponding baseline int8_t kernel.
+You will use N=256 and (warps=4, threads=4), (warps=4, threads=8), (warps=8, threads=4), and (warps=8, threads=8) on a 4-core GPU.
+Plot the total instruction count and execution cycles to observe the performance improvement.

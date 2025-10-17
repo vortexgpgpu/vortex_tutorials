@@ -42,8 +42,10 @@ Next, you need to add logic to expose these counters in the CSR. In [emulator.cp
 ```c++
 case VX_DCR_MPM_CLASS_3: {
   // Add your custom counters here for Class 3:
-  CSR_READ_64(VX_CSR_MPM_TOTAL_ISSUED_WARPS, core_perf.total_issued_warps);
-  CSR_READ_64(VX_CSR_MPM_TOTAL_ACTIVE_THREADS, core_perf.total_active_threads);
+  switch (addr) {
+    CSR_READ_64(VX_CSR_MPM_TOTAL_ISSUED_WARPS, core_perf.total_issued_warps);
+    CSR_READ_64(VX_CSR_MPM_TOTAL_ACTIVE_THREADS, core_perf.total_active_threads);
+  }
 } break;
 ```
 
@@ -143,6 +145,7 @@ In this code, `vx_mpm_query` retrieves the counters from the hardware, and then 
 ### Step 6: Testing
 
 To test your changes, you can run the software demo using the `--perf=3` command line argument. This will display your new `total_issued_warps` and `total_active_threads` counters. Be sure to run `../configure` after making changes to the vortex source in order for the changes to be reflected in the `build` directory.
+And then run `make`
 
 ```bash
 ./ci/blackbox.sh --cores=4 --app=demo --driver=simx --perf=3
