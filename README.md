@@ -111,6 +111,8 @@ Provided are seven hands-on tutorial assignments covering various aspects of Vor
 
 [Assignment 7](Exercises/assignment7.md) teaches how to debug Vortex.
 
+[Assignment 8](Exercises/assignment8.md) and [Assignment 9](Exercises/assignment9.md) add support for a new input matrix format: TF32 (Tensor Float 32) with focus on FMA operations and implementation for the same in SIMX and RTL respectively.
+
 ## Getting Vortex
 
 ### Remote Access
@@ -130,7 +132,7 @@ If you would like to set up Vortex on your own system, [instructions can be foun
 ## Relevant Repos
 
 * [Vortex](https://github.com/vortexgpgpu/vortex)
-* 
+
 * [Vortex Toolchain](https://github.com/vortexgpgpu/vortex-toolchain-prebuilt)
 
 * [Cupbop on Vortex] (https://github.com/cupbop/CuPBoP_Vortex)
