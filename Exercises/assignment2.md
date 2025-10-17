@@ -25,6 +25,9 @@ You will also need to add the definition next to the other class definitions nea
 
 ```verilog
 `define VX_DCR_MPM_CLASS_3              3
+
+`define PERF_CTR_BITS                   44
+
 ```
 
 ### Step 2: Register the Counters CSRs
@@ -35,8 +38,8 @@ Next, you need to add logic to expose these counters in the CSR. In [VX_csr_data
 `VX_DCR_MPM_CLASS_3: begin
     case (read_addr)
     // Add your custom counters here for Class 3:
-    `CSR_READ_64(`VX_CSR_MPM_TOTAL_ISSUED_WARPS, read_data_ro_w, pipeline_perf_if.sched.total_issued_warps);
-    `CSR_READ_64(`VX_CSR_MPM_TOTAL_ACTIVE_THREADS, read_data_ro_w, pipeline_perf_if.sched.total_active_threads);
+    `CSR_READ_64(`VX_CSR_MPM_TOTAL_ISSUED_WARPS, read_data_ro_w, pipeline_perf.sched.total_issued_warps);
+    `CSR_READ_64(`VX_CSR_MPM_TOTAL_ACTIVE_THREADS, read_data_ro_w, pipeline_perf.sched.total_active_threads);
     default:;
     endcase
 end
@@ -155,6 +158,7 @@ In this code, `vx_mpm_query` retrieves the counters from the hardware, and then 
 ### Step 6: Testing
 
 To test your changes, you can run the software demo using the `--perf=3` command line argument. This will display your new `total_issued_warps` and `total_active_threads` counters. Be sure to run `../configure` after making changes to the vortex source in order for the changes to be reflected in the `build` directory.
+And then run `make`
 
 ```bash
 ./ci/blackbox.sh --cores=4 --app=demo --driver=rtlsim --perf=3
