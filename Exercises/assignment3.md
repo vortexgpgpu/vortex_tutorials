@@ -3,7 +3,7 @@
 This assignment will be divided into two parts. The first part involves adding a new prefetch instruction as well as a corresponding flag bit to identify if it has been prefetched. The second involves adding three performance counters to measure the following:
 
 1. Number of unique prefetch requests to main memory
-2. Number of unused prefetched blocks  
+2. Number of unused prefetched blocks
 3. Number of late prefetches
 
 All of these counters should be implemented in `cache_sim.h`
@@ -82,7 +82,7 @@ In the `op_string()` function, we need to add a `PREFETCH` case (under the `FENC
 case LsuType::PREFETCH: return {"PREFETCH", ""};  // ADD
 ```
 
-#### 2c: Editing execute.cpp
+#### 2c: Editing `execute.cpp`
 
 In order for the instruction to perform a prefetch, we need to add a case for `PREFETCH` in the `execute()` function (in the `/sim/simx/execute.cpp` file)
 
@@ -145,15 +145,21 @@ void kernel_body(kernel_arg_t* __UNIFORM__ arg) {
 	int32_t* dst_ptr  = (int32_t*)arg->dst_addr;
 
 	uint32_t offset = blockIdx.x * count;
-	for (uint32_t i = 0; i < count; ++i) {
-		// ADD
+
+	const uint32_t elements_per_line = 16; // ADD: 64 bytes cache size / 4 bytes per int_32
+    
+  for (uint32_t i = 0; i < count; ++i) {
+	  // ADD: Only prefetch at cache line boundaries
+    if (i % elements_per_line == 0) {
 		vx_prefetch(&src0_ptr[offset + i]);
-		vx_prefetch(&src1_ptr[offset + i]);
-		
-		dst_ptr[offset+i] = src0_ptr[offset+i] + src1_ptr[offset+i];
-	}
+      	vx_prefetch(&src1_ptr[offset + i]);
+    }
+        
+    dst_ptr[offset+i] = src0_ptr[offset+i] + src1_ptr[offset+i];
+  }
 
 	vx_fence();
+
 }
 
 int main() {
@@ -360,9 +366,12 @@ Now that we have the flags set in `cache_sim.cpp`, we want to implement logic in
 
 ```cpp
 void processInputs() {
-    // ...
-    
-    // second: schedule memory fill
+	// proces inputs in prioroty order
+	do {
+			
+		// ...
+
+		// second: schedule memory fill
 		if (!this->mem_rsp_port.empty()) {
 			auto& mem_rsp = mem_rsp_port.front();
 			DT(3, this->name() << "-fill-rsp: " << mem_rsp);
@@ -373,27 +382,43 @@ void processInputs() {
 			line.valid  = true;
 			line.tag    = entry.bank_req.addr_tag;
 			line.was_prefetched = entry.bank_req.is_prefetch;  // ADD
-    	
-    	// ...
+    		line.was_used = false;  // ADD
+			mshr_.dequeue(&bank_req);
+			--pending_mshr_size_;
+			pipe_req_->push(bank_req);
+			mem_rsp_port.pop();
+			--pending_fill_reqs_;
+			break;
 		}
-    
-    // third: schedule core request
-    if (!this->core_req_port.empty()) {
-      auto& core_req = core_req_port.front();
-        
-      // ...
-        
-      bank_req.type = bank_req_t::Core;
-      bank_req.cid = core_req.cid;
-      bank_req.uuid = core_req.uuid;
-      bank_req.set_id = params_.addr_set_id(core_req.addr);
-      bank_req.addr_tag = params_.addr_tag(core_req.addr);
-      bank_req.req_tag = core_req.tag;
-      bank_req.write = core_req.write;
-      bank_req.is_prefetch = core_req.is_prefetch;  // ADD
-        
-      // ...
-    }
+
+		// third: schedule core request
+		if (!this->core_req_port.empty()) {
+			auto& core_req = core_req_port.front();
+			// check MSHR capacity
+			if ((!core_req.write || config_.write_back)
+			 && (pending_mshr_size_ >= mshr_.capacity())) {
+				++perf_stats_.mshr_stalls;
+				break;
+			}
+			++pending_mshr_size_;
+			DT(3, this->name() << "-core-req: " << core_req);
+			bank_req.type = bank_req_t::Core;
+			bank_req.cid = core_req.cid;
+			bank_req.uuid = core_req.uuid;
+			bank_req.set_id = params_.addr_set_id(core_req.addr);
+			bank_req.addr_tag = params_.addr_tag(core_req.addr);
+			bank_req.req_tag = core_req.tag;
+			bank_req.write = core_req.write;
+			bank_req.is_prefetch = core_req.is_prefetch;  // ADD
+			pipe_req_->push(bank_req);
+			if (core_req.write)
+				++perf_stats_.writes;
+			else
+				++perf_stats_.reads;
+			core_req_port.pop();
+			break;
+		}
+	} while (false);
 }
 ```
 
@@ -402,28 +427,75 @@ void processInputs() {
 Now we want to propagate `is_prefetch` through `LsuMemAdapter` (in the `/sim/simx/types.cpp` file) so that the counter can see the flag
 
 ```cpp
+// ...
+
 // process incoming requests
-  if (!ReqIn.empty()) {
-    auto& in_req = ReqIn.front();
-    assert(in_req.mask.size() == input_size);
-    for (uint32_t i = 0; i < input_size; ++i) {
-      if (in_req.mask.test(i)) {
-        // build memory request
-        MemReq out_req;
-        out_req.write = in_req.write;
-        out_req.addr  = in_req.addrs.at(i);
-        out_req.is_prefetch = in_req.is_prefetch; // ADD
-        out_req.type  = get_addr_type(in_req.addrs.at(i));
-        out_req.tag   = in_req.tag;
-        out_req.cid   = in_req.cid;
-        out_req.uuid  = in_req.uuid;
-        // send memory request
-        ReqOut.at(i).push(out_req, delay_);
-        DT(4, this->name() << "-req" << i << ": " << out_req);
-      }
+if (!ReqIn.empty()) {
+  auto& in_req = ReqIn.front();
+  assert(in_req.mask.size() == input_size);
+  for (uint32_t i = 0; i < input_size; ++i) {
+    if (in_req.mask.test(i)) {
+      // build memory request
+      MemReq out_req;
+      out_req.write = in_req.write;
+      out_req.addr  = in_req.addrs.at(i);
+      out_req.is_prefetch = in_req.is_prefetch; // ADD
+      out_req.type  = get_addr_type(in_req.addrs.at(i));
+      out_req.tag   = in_req.tag;
+      out_req.cid   = in_req.cid;
+      out_req.uuid  = in_req.uuid;
+      // send memory request
+      ReqOut.at(i).push(out_req, delay_);
+      DT(4, this->name() << "-req" << i << ": " << out_req);
     }
-    ReqIn.pop();
   }
+  ReqIn.pop();
+}
+
+// ...
+```
+
+Similarly, we also want to do the same for the `LocalMemSwitch::tick()` function
+
+```cpp
+// ...
+
+// process incoming requests
+if (!ReqIn.empty()) {
+  auto& in_req = ReqIn.front();
+
+  LsuReq out_dc_req(in_req.mask.size());
+  out_dc_req.write = in_req.write;
+  out_dc_req.tag   = in_req.tag;
+  out_dc_req.cid   = in_req.cid;
+  out_dc_req.uuid  = in_req.uuid;
+
+  out_dc_req.is_prefetch = in_req.is_prefetch; // ADD
+
+  LsuReq out_lmem_req(out_dc_req);
+    
+// ...
+```
+
+#### 1d: Editing `mem_coalescer.cpp`
+
+In the `MemCoalescer::tick()` function, we also need to propagate through the memory coalescer to ensure the flag is set throughout our structures
+
+```cpp
+// ...
+
+// build memory request
+LsuReq out_req{output_size_};
+out_req.mask = out_mask;
+out_req.tag = tag;
+out_req.write = in_req.write;
+out_req.addrs = out_addrs;
+out_req.cid = in_req.cid;
+out_req.uuid = in_req.uuid;
+  
+out_req.is_prefetch = in_req.is_prefetch; // ADD
+
+// ...
 ```
 
 ### Step 2: Adding Counters
@@ -480,39 +552,65 @@ To implement functionality, we add counter logic in the `processRequests()` func
 
 ```cpp
 void processRequests() {
-    if (pipe_req_->empty())
-        return;
-    auto bank_req = pipe_req_->front();
-
-    switch (bank_req.type) {
-    
-    // ...
+	    
+    //...
 
     case bank_req_t::Core: {
-        
-        // ...
-        
+        int32_t free_line_id = -1;
+        int32_t repl_line_id = 0;
+        auto& set = sets_.at(bank_req.set_id);
+		
+        // tag lookup
+        int hit_line_id = set.tag_lookup(bank_req.addr_tag, &free_line_id, &repl_line_id);
+		
         if (hit_line_id != -1) {
-        
-            // ...
-            
+            // Hit handling
+            auto& hit_line = set.lines.at(hit_line_id);
+		
+            // ADD: Mark as used if it was prefetched
+            if (hit_line.was_prefetched && bank_req.is_prefetch) {
+                hit_line.was_used = true;
+            }
+			
+            if (bank_req.write) {
+                // handle write hit
+                if (!config_.write_back) {
+                    MemReq mem_req;
+                    mem_req.addr  = params_.mem_addr(bank_id_, bank_req.set_id, bank_req.addr_tag);
+                    mem_req.write = true;
+                    mem_req.cid   = bank_req.cid;
+                    mem_req.uuid  = bank_req.uuid;
+                    this->mem_req_port.push(mem_req);
+                    DT(3, this->name() << "-writethrough: " << mem_req);
+                } else {
+                    hit_line.dirty = true;
+                }
+            }
+			
+            // CHANGE: send core response (not for prefetch)
+            if (!bank_req.is_prefetch && (!bank_req.write || config_.write_reponse)) {
+                MemRsp core_rsp{bank_req.req_tag, bank_req.cid, bank_req.uuid};
+                this->core_rsp_port.push(core_rsp);
+                DT(3, this->name() << "-core-rsp: " << core_rsp);
+            }
+            --pending_mshr_size_;
         } else {
-            // MISS
+            // Miss handling
             if (bank_req.write && !bank_req.is_prefetch) {
                 ++perf_stats_.write_misses;
             } else if (!bank_req.is_prefetch) {
                 ++perf_stats_.read_misses;
             }
-            
-            // Counter 1: Count unique prefetch requests that miss
+		
+            // ADD: Counter 1 - Count unique prefetch requests that miss
             if (bank_req.is_prefetch) {
                 ++perf_stats_.prefetch_requests;
             }
 
-            // Check if there's already a pending MSHR for this address
+            // ADD: Check if there's already a pending MSHR for this address
             auto mshr_pending = mshr_.lookup(bank_req);
-            
-            // Counter 3: Late prefetch (demand arrives while prefetch in MSHR)
+		
+            // ADD: Counter 3 - Late prefetch (demand arrives while prefetch in MSHR)
             if (!bank_req.is_prefetch && mshr_pending) {
                 ++perf_stats_.prefetch_late;
             }
@@ -520,12 +618,12 @@ void processRequests() {
             if (free_line_id == -1 && config_.write_back) {
                 // write back dirty line
                 auto& repl_line = set.lines.at(repl_line_id);
-                
-                // Counter 2: Unused prefetch (evicting prefetched but unused line)
+			
+                // ADD: Counter 2 - Unused prefetch (evicting prefetched but unused line)
                 if (repl_line.was_prefetched && !repl_line.was_used) {
                     ++perf_stats_.prefetch_unused;
                 }
-                
+			
                 if (repl_line.dirty) {
                     MemReq mem_req;
                     mem_req.addr  = params_.mem_addr(bank_id_, bank_req.set_id, repl_line.tag);
@@ -537,7 +635,47 @@ void processRequests() {
                 }
             }
 
-            // ...
+            if (bank_req.write && !config_.write_back) {
+                // forward write request to memory
+
+                {
+                    MemReq mem_req;
+                    mem_req.addr  = params_.mem_addr(bank_id_, bank_req.set_id, bank_req.addr_tag);
+                    mem_req.write = true;
+                    mem_req.cid   = bank_req.cid;
+                    mem_req.uuid  = bank_req.uuid;
+                    this->mem_req_port.push(mem_req);
+                    DT(3, this->name() << "-writethrough: " << mem_req);
+                }
+                // CHANGE: send core response
+                if (config_.write_reponse && !bank_req.is_prefetch) {
+                    MemRsp core_rsp{bank_req.req_tag, bank_req.cid, bank_req.uuid};
+                    this->core_rsp_port.push(core_rsp);
+                    DT(3, this->name() << "-core-rsp: " << core_rsp);
+                }
+                --pending_mshr_size_;
+            } else {
+	            // MSHR lookup
+				auto mshr_pending = mshr_.lookup(bank_req);
+	            
+                // allocate MSHR
+                auto mshr_id = mshr_.enqueue(bank_req, (free_line_id != -1) ? free_line_id : repl_line_id);
+                DT(3, this->name() << "-mshr-enqueue: " << bank_req);
+
+                // send fill request
+                if (!mshr_pending) {
+                    MemReq mem_req;
+                    mem_req.addr  = params_.mem_addr(bank_id_, bank_req.set_id, bank_req.addr_tag);
+                    mem_req.write = false;
+                    mem_req.tag   = mshr_id;
+                    mem_req.cid   = bank_req.cid;
+                    mem_req.uuid  = bank_req.uuid;
+                    mem_req.is_prefetch = bank_req.is_prefetch;  // ADD
+                    this->mem_req_port.push(mem_req);
+                    DT(3, this->name() << "-fill-req: " << mem_req);
+                    ++pending_fill_reqs_;
+                }
+            }
         }
     } break;
     
@@ -554,13 +692,15 @@ In order to print the results, we first need to add three new CSR definitions in
 **Note:** Despite this assignment focusing on SimX (C++), we are editing a `*.vh` file. This file creates a `VX_types.h` file that's in the `/build/hw/` directory (after making the build)
 
 ```verilog
-`define VX_CSR_MPM_PREFETCH_REQ     12'hB20     // unique prefetch requests
-`define VX_CSR_MPM_PREFETCH_REQ_H   12'hBA0
-`define VX_CSR_MPM_PREFETCH_UNUSED  12'hB21     // unused prefetches
-`define VX_CSR_MPM_PREFETCH_UNUSED_H 12'hBA1
-`define VX_CSR_MPM_PREFETCH_LATE    12'hB22     // late prefetches
-`define VX_CSR_MPM_PREFETCH_LATE_H  12'hBA2
+`define VX_CSR_MPM_PREFETCH_REQ     12'hB15     // unique prefetch requests
+`define VX_CSR_MPM_PREFETCH_REQ_H   12'hB95
+`define VX_CSR_MPM_PREFETCH_UNUSED  12'hB16     // unused prefetches
+`define VX_CSR_MPM_PREFETCH_UNUSED_H 12'hB96
+`define VX_CSR_MPM_PREFETCH_LATE    12'hB17     // late prefetches
+`define VX_CSR_MPM_PREFETCH_LATE_H  12'hB97
 ```
+
+**IMPORTANT:** Because class 2 counters are full, we cannot add these counters within that class, adding these counters into that class will result in errors!
 
 #### 3b: Editing `utils.cpp`
 
@@ -582,9 +722,9 @@ uint64_t prefetch_late;
 CHECK_ERR(vx_mpm_query(hdevice, VX_CSR_MPM_PREFETCH_LATE, core_id, &prefetch_late), {
 return err;
 });
-fprintf(stream, "PERF: core%d: dcache prefetch requests=%ld\n", core_id, prefetch_requests);
-fprintf(stream, "PERF: core%d: dcache prefetch unused=%ld\n", core_id, prefetch_unused);
-fprintf(stream, "PERF: core%d: dcache prefetch late=%ld\n", core_id, prefetch_late);
+fprintf(stream, "PERF: core%d: dcache prefetch requests=%lu\n", core_id, prefetch_requests);
+fprintf(stream, "PERF: core%d: dcache prefetch unused=%lu\n", core_id, prefetch_unused);
+fprintf(stream, "PERF: core%d: dcache prefetch late=%lu\n", core_id, prefetch_late);
 
 // ...
 ```
@@ -635,7 +775,7 @@ To test your changes, you can run the following to build and verify prefetch fun
 make -s
 
 # Test with SimX
-./ci/blackbox.sh --driver=simx --cores=1 --app=prefetch --perf=2
+./ci/blackbox.sh --driver=simx --cores=1 --app=prefetch --perf=1
 ```
 
 The expected result is a test passed message and an output of all 3 metric counters, feel free to change `kernel.cpp` with different instruction/data sizes to observe prefetch efficiency
