@@ -1,0 +1,1135 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"/><title>Assignment #3: GPU Software Prefetching (SimX)</title><style>
+/* cspell:disable-file */
+/* webkit printing magic: print all background colors */
+html {
+	-webkit-print-color-adjust: exact;
+}
+* {
+	box-sizing: border-box;
+	-webkit-print-color-adjust: exact;
+}
+
+html,
+body {
+	margin: 0;
+	padding: 0;
+}
+@media only screen {
+	body {
+		margin: 2em auto;
+		max-width: 900px;
+		color: rgb(55, 53, 47);
+	}
+}
+
+body {
+	line-height: 1.5;
+	white-space: pre-wrap;
+}
+
+a,
+a.visited {
+	color: inherit;
+	text-decoration: underline;
+}
+
+.pdf-relative-link-path {
+	font-size: 80%;
+	color: #444;
+}
+
+h1,
+h2,
+h3 {
+	letter-spacing: -0.01em;
+	line-height: 1.2;
+	font-weight: 600;
+	margin-bottom: 0;
+}
+
+.page-title {
+	font-size: 2.5rem;
+	font-weight: 700;
+	margin-top: 0;
+	margin-bottom: 0.75em;
+}
+
+h1 {
+	font-size: 1.875rem;
+	margin-top: 1.875rem;
+}
+
+h2 {
+	font-size: 1.5rem;
+	margin-top: 1.5rem;
+}
+
+h3 {
+	font-size: 1.25rem;
+	margin-top: 1.25rem;
+}
+
+.source {
+	border: 1px solid #ddd;
+	border-radius: 3px;
+	padding: 1.5em;
+	word-break: break-all;
+}
+
+.callout {
+	border-radius: 10px;
+	padding: 1rem;
+}
+
+figure {
+	margin: 1.25em 0;
+	page-break-inside: avoid;
+}
+
+figcaption {
+	opacity: 0.5;
+	font-size: 85%;
+	margin-top: 0.5em;
+}
+
+mark {
+	background-color: transparent;
+}
+
+.indented {
+	padding-left: 1.5em;
+}
+
+hr {
+	background: transparent;
+	display: block;
+	width: 100%;
+	height: 1px;
+	visibility: visible;
+	border: none;
+	border-bottom: 1px solid rgba(55, 53, 47, 0.09);
+}
+
+img {
+	max-width: 100%;
+}
+
+@media only print {
+	img {
+		max-height: 100vh;
+		object-fit: contain;
+	}
+}
+
+@page {
+	margin: 1in;
+}
+
+.collection-content {
+	font-size: 0.875rem;
+}
+
+.collection-content td {
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.column-list {
+	display: flex;
+	justify-content: space-between;
+}
+
+.column {
+	padding: 0 1em;
+}
+
+.column:first-child {
+	padding-left: 0;
+}
+
+.column:last-child {
+	padding-right: 0;
+}
+
+.table_of_contents-item {
+	display: block;
+	font-size: 0.875rem;
+	line-height: 1.3;
+	padding: 0.125rem;
+}
+
+.table_of_contents-indent-1 {
+	margin-left: 1.5rem;
+}
+
+.table_of_contents-indent-2 {
+	margin-left: 3rem;
+}
+
+.table_of_contents-indent-3 {
+	margin-left: 4.5rem;
+}
+
+.table_of_contents-link {
+	text-decoration: none;
+	opacity: 0.7;
+	border-bottom: 1px solid rgba(55, 53, 47, 0.18);
+}
+
+table,
+th,
+td {
+	border: 1px solid rgba(55, 53, 47, 0.09);
+	border-collapse: collapse;
+}
+
+table {
+	border-left: none;
+	border-right: none;
+}
+
+th,
+td {
+	font-weight: normal;
+	padding: 0.25em 0.5em;
+	line-height: 1.5;
+	min-height: 1.5em;
+	text-align: left;
+}
+
+th {
+	color: rgba(55, 53, 47, 0.6);
+}
+
+ol,
+ul {
+	margin: 0;
+	margin-block-start: 0.6em;
+	margin-block-end: 0.6em;
+}
+
+li > ol:first-child,
+li > ul:first-child {
+	margin-block-start: 0.6em;
+}
+
+ul > li {
+	list-style: disc;
+}
+
+ul.to-do-list {
+	padding-inline-start: 0;
+}
+
+ul.to-do-list > li {
+	list-style: none;
+}
+
+.to-do-children-checked {
+	text-decoration: line-through;
+	opacity: 0.375;
+}
+
+ul.toggle > li {
+	list-style: none;
+}
+
+ul {
+	padding-inline-start: 1.7em;
+}
+
+ul > li {
+	padding-left: 0.1em;
+}
+
+ol {
+	padding-inline-start: 1.6em;
+}
+
+ol > li {
+	padding-left: 0.2em;
+}
+
+.mono ol {
+	padding-inline-start: 2em;
+}
+
+.mono ol > li {
+	text-indent: -0.4em;
+}
+
+.toggle {
+	padding-inline-start: 0em;
+	list-style-type: none;
+}
+
+/* Indent toggle children */
+.toggle > li > details {
+	padding-left: 1.7em;
+}
+
+.toggle > li > details > summary {
+	margin-left: -1.1em;
+}
+
+.selected-value {
+	display: inline-block;
+	padding: 0 0.5em;
+	background: rgba(206, 205, 202, 0.5);
+	border-radius: 3px;
+	margin-right: 0.5em;
+	margin-top: 0.3em;
+	margin-bottom: 0.3em;
+	white-space: nowrap;
+}
+
+.collection-title {
+	display: inline-block;
+	margin-right: 1em;
+}
+
+.page-description {
+	margin-bottom: 2em;
+}
+
+.simple-table {
+	margin-top: 1em;
+	font-size: 0.875rem;
+	empty-cells: show;
+}
+.simple-table td {
+	height: 29px;
+	min-width: 120px;
+}
+
+.simple-table th {
+	height: 29px;
+	min-width: 120px;
+}
+
+.simple-table-header-color {
+	background: rgb(247, 246, 243);
+	color: black;
+}
+.simple-table-header {
+	font-weight: 500;
+}
+
+time {
+	opacity: 0.5;
+}
+
+.icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	max-width: 1.2em;
+	max-height: 1.2em;
+	text-decoration: none;
+	vertical-align: text-bottom;
+	margin-right: 0.5em;
+}
+
+img.icon {
+	border-radius: 3px;
+}
+
+.callout img.notion-static-icon {
+	width: 1em;
+	height: 1em;
+}
+
+.callout p {
+	margin: 0;
+}
+
+.callout h1,
+.callout h2,
+.callout h3 {
+	margin: 0 0 0.6rem;
+}
+
+.user-icon {
+	width: 1.5em;
+	height: 1.5em;
+	border-radius: 100%;
+	margin-right: 0.5rem;
+}
+
+.user-icon-inner {
+	font-size: 0.8em;
+}
+
+.text-icon {
+	border: 1px solid #000;
+	text-align: center;
+}
+
+.page-cover-image {
+	display: block;
+	object-fit: cover;
+	width: 100%;
+	max-height: 30vh;
+}
+
+.page-header-icon {
+	font-size: 3rem;
+	margin-bottom: 1rem;
+}
+
+.page-header-icon-with-cover {
+	margin-top: -0.72em;
+	margin-left: 0.07em;
+}
+
+.page-header-icon img {
+	border-radius: 3px;
+}
+
+.link-to-page {
+	margin: 1em 0;
+	padding: 0;
+	border: none;
+	font-weight: 500;
+}
+
+p > .user {
+	opacity: 0.5;
+}
+
+td > .user,
+td > time {
+	white-space: nowrap;
+}
+
+input[type="checkbox"] {
+	transform: scale(1.5);
+	margin-right: 0.6em;
+	vertical-align: middle;
+}
+
+p {
+	margin-top: 0.5em;
+	margin-bottom: 0.5em;
+}
+
+.image {
+	border: none;
+	margin: 1.5em 0;
+	padding: 0;
+	border-radius: 0;
+	text-align: center;
+}
+
+.code,
+code {
+	background: rgba(135, 131, 120, 0.15);
+	border-radius: 3px;
+	padding: 0.2em 0.4em;
+	border-radius: 3px;
+	font-size: 85%;
+	tab-size: 2;
+}
+
+code {
+	color: #eb5757;
+}
+
+.code {
+	padding: 1.5em 1em;
+}
+
+.code-wrap {
+	white-space: pre-wrap;
+	word-break: break-all;
+}
+
+.code > code {
+	background: none;
+	padding: 0;
+	font-size: 100%;
+	color: inherit;
+}
+
+blockquote {
+	font-size: 1em;
+	margin: 1em 0;
+	padding-left: 1em;
+	border-left: 3px solid rgb(55, 53, 47);
+}
+
+blockquote.quote-large {
+	font-size: 1.25em;
+}
+
+.bookmark {
+	text-decoration: none;
+	max-height: 8em;
+	padding: 0;
+	display: flex;
+	width: 100%;
+	align-items: stretch;
+}
+
+.bookmark-title {
+	font-size: 0.85em;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	height: 1.75em;
+	white-space: nowrap;
+}
+
+.bookmark-text {
+	display: flex;
+	flex-direction: column;
+}
+
+.bookmark-info {
+	flex: 4 1 180px;
+	padding: 12px 14px 14px;
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+}
+
+.bookmark-image {
+	width: 33%;
+	flex: 1 1 180px;
+	display: block;
+	position: relative;
+	object-fit: cover;
+	border-radius: 1px;
+}
+
+.bookmark-description {
+	color: rgba(55, 53, 47, 0.6);
+	font-size: 0.75em;
+	overflow: hidden;
+	max-height: 4.5em;
+	word-break: break-word;
+}
+
+.bookmark-href {
+	font-size: 0.75em;
+	margin-top: 0.25em;
+}
+
+.sans { font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol"; }
+.code { font-family: "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace; }
+.serif { font-family: Lyon-Text, Georgia, ui-serif, serif; }
+.mono { font-family: iawriter-mono, Nitti, Menlo, Courier, monospace; }
+.pdf .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK JP'; }
+.pdf:lang(zh-CN) .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK SC'; }
+.pdf:lang(zh-TW) .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK TC'; }
+.pdf:lang(ko-KR) .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK KR'; }
+.pdf .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK JP'; }
+.pdf:lang(zh-CN) .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK SC'; }
+.pdf:lang(zh-TW) .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK TC'; }
+.pdf:lang(ko-KR) .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK KR'; }
+.pdf .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK JP'; }
+.pdf:lang(zh-CN) .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK SC'; }
+.pdf:lang(zh-TW) .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK TC'; }
+.pdf:lang(ko-KR) .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK KR'; }
+.pdf .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK JP'; }
+.pdf:lang(zh-CN) .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK SC'; }
+.pdf:lang(zh-TW) .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK TC'; }
+.pdf:lang(ko-KR) .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK KR'; }
+.highlight-default {
+	color: rgba(44, 44, 43, 1);
+}
+.highlight-gray {
+	color: rgba(134, 131, 126, 1);
+	fill: rgba(134, 131, 126, 1);
+}
+.highlight-brown {
+	color: rgba(159, 118, 90, 1);
+	fill: rgba(159, 118, 90, 1);
+}
+.highlight-orange {
+	color: rgba(210, 123, 45, 1);
+	fill: rgba(210, 123, 45, 1);
+}
+.highlight-yellow {
+	color: rgba(203, 148, 52, 1);
+	fill: rgba(203, 148, 52, 1);
+}
+.highlight-teal {
+	color: rgba(80, 148, 110, 1);
+	fill: rgba(80, 148, 110, 1);
+}
+.highlight-blue {
+	color: rgba(56, 125, 201, 1);
+	fill: rgba(56, 125, 201, 1);
+}
+.highlight-purple {
+	color: rgba(154, 107, 180, 1);
+	fill: rgba(154, 107, 180, 1);
+}
+.highlight-pink {
+	color: rgba(193, 76, 138, 1);
+	fill: rgba(193, 76, 138, 1);
+}
+.highlight-red {
+	color: rgba(207, 81, 72, 1);
+	fill: rgba(207, 81, 72, 1);
+}
+.highlight-default_background {
+	color: rgba(44, 44, 43, 1);
+}
+.highlight-gray_background {
+	background: rgba(42, 28, 0, 0.07);
+}
+.highlight-brown_background {
+	background: rgba(139, 46, 0, 0.086);
+}
+.highlight-orange_background {
+	background: rgba(224, 101, 1, 0.129);
+}
+.highlight-yellow_background {
+	background: rgba(211, 168, 0, 0.137);
+}
+.highlight-teal_background {
+	background: rgba(0, 100, 45, 0.09);
+}
+.highlight-blue_background {
+	background: rgba(0, 124, 215, 0.094);
+}
+.highlight-purple_background {
+	background: rgba(102, 0, 178, 0.078);
+}
+.highlight-pink_background {
+	background: rgba(197, 0, 93, 0.086);
+}
+.highlight-red_background {
+	background: rgba(223, 22, 0, 0.094);
+}
+.block-color-default {
+	color: inherit;
+	fill: inherit;
+}
+.block-color-gray {
+	color: rgba(134, 131, 126, 1);
+	fill: rgba(134, 131, 126, 1);
+}
+.block-color-brown {
+	color: rgba(159, 118, 90, 1);
+	fill: rgba(159, 118, 90, 1);
+}
+.block-color-orange {
+	color: rgba(210, 123, 45, 1);
+	fill: rgba(210, 123, 45, 1);
+}
+.block-color-yellow {
+	color: rgba(203, 148, 52, 1);
+	fill: rgba(203, 148, 52, 1);
+}
+.block-color-teal {
+	color: rgba(80, 148, 110, 1);
+	fill: rgba(80, 148, 110, 1);
+}
+.block-color-blue {
+	color: rgba(56, 125, 201, 1);
+	fill: rgba(56, 125, 201, 1);
+}
+.block-color-purple {
+	color: rgba(154, 107, 180, 1);
+	fill: rgba(154, 107, 180, 1);
+}
+.block-color-pink {
+	color: rgba(193, 76, 138, 1);
+	fill: rgba(193, 76, 138, 1);
+}
+.block-color-red {
+	color: rgba(207, 81, 72, 1);
+	fill: rgba(207, 81, 72, 1);
+}
+.block-color-default_background {
+	color: inherit;
+	fill: inherit;
+}
+.block-color-gray_background {
+	background: rgba(240, 239, 237, 1);
+}
+.block-color-brown_background {
+	background: rgba(245, 237, 233, 1);
+}
+.block-color-orange_background {
+	background: rgba(251, 235, 222, 1);
+}
+.block-color-yellow_background {
+	background: rgba(249, 243, 220, 1);
+}
+.block-color-teal_background {
+	background: rgba(232, 241, 236, 1);
+}
+.block-color-blue_background {
+	background: rgba(229, 242, 252, 1);
+}
+.block-color-purple_background {
+	background: rgba(243, 235, 249, 1);
+}
+.block-color-pink_background {
+	background: rgba(250, 233, 241, 1);
+}
+.block-color-red_background {
+	background: rgba(252, 233, 231, 1);
+}
+.select-value-color-default { background-color: rgba(42, 28, 0, 0.07); }
+.select-value-color-gray { background-color: rgba(28, 19, 1, 0.11); }
+.select-value-color-brown { background-color: rgba(127, 51, 0, 0.156); }
+.select-value-color-orange { background-color: rgba(196, 88, 0, 0.203); }
+.select-value-color-yellow { background-color: rgba(209, 156, 0, 0.282); }
+.select-value-color-green { background-color: rgba(0, 96, 38, 0.156); }
+.select-value-color-blue { background-color: rgba(0, 118, 217, 0.203); }
+.select-value-color-purple { background-color: rgba(92, 0, 163, 0.141); }
+.select-value-color-pink { background-color: rgba(183, 0, 78, 0.152); }
+.select-value-color-red { background-color: rgba(206, 24, 0, 0.164); }
+
+.checkbox {
+	display: inline-flex;
+	vertical-align: text-bottom;
+	width: 16;
+	height: 16;
+	background-size: 16px;
+	margin-left: 2px;
+	margin-right: 5px;
+}
+
+.checkbox-on {
+	background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2016%2016%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%0A%3Crect%20width%3D%2216%22%20height%3D%2216%22%20fill%3D%22%2358A9D7%22%2F%3E%0A%3Cpath%20d%3D%22M6.71429%2012.2852L14%204.9995L12.7143%203.71436L6.71429%209.71378L3.28571%206.2831L2%207.57092L6.71429%2012.2852Z%22%20fill%3D%22white%22%2F%3E%0A%3C%2Fsvg%3E");
+}
+
+.checkbox-off {
+	background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2016%2016%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%0A%3Crect%20x%3D%220.75%22%20y%3D%220.75%22%20width%3D%2214.5%22%20height%3D%2214.5%22%20fill%3D%22white%22%20stroke%3D%22%2336352F%22%20stroke-width%3D%221.5%22%2F%3E%0A%3C%2Fsvg%3E");
+}
+	
+</style></head><body><article id="287c2bbf-ba00-80ad-90ad-ee503b1fd2b1" class="page sans"><header><h1 class="page-title"><strong>Assignment #3: GPU Software Prefetching (SimX)</strong></h1><p class="page-description"></p></header><div class="page-body"><p id="287c2bbf-ba00-8043-9d69-dd7a8b2c979c" class="">This assignment will be divided into two parts. The first part involves adding a new prefetch instruction as well as a corresponding flag bit to identify if it has been prefetched. The second involves adding three performance counters to measure the following:</p><ol type="1" id="287c2bbf-ba00-800e-a2d7-dabd5a6b0926" class="numbered-list" start="1"><li>Number of unique prefetch requests to main memory</li></ol><ol type="1" id="287c2bbf-ba00-80aa-b514-e7a12b1968c3" class="numbered-list" start="2"><li>Number of unused prefetched blocks</li></ol><ol type="1" id="287c2bbf-ba00-8085-98e4-d72ced6547b5" class="numbered-list" start="3"><li>Number of late prefetches</li></ol><p id="287c2bbf-ba00-8006-bb46-d027dcc66a32" class="">All of these counters should be implemented in <code>cache_sim.h</code><mark class="highlight-gray"> </mark></p><h1 id="287c2bbf-ba00-80a9-b91f-e27c66cce0c2" class="">Part 1: Adding Prefetch Instruction to SimX</h1><p id="287c2bbf-ba00-80fb-86f6-f22914370cb0" class="">To begin, we will add the prefetch instruction in a new group of instructions. Then we want to develop a testing directory and script to ensure correctness and functionality</p><h2 id="287c2bbf-ba00-80b9-a13a-d3474e57d56e" class="">Step 1: Adding Prefetch Intrinsic</h2><p id="287c2bbf-ba00-80da-9cfd-c6357d6ad28b" class="">First, add the prefetch intrinsic to <code>/kernel/include/vx_intrinsics.h</code> (right after <code>vx_barrier()</code>)</p><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="287c2bbf-ba00-8078-8cee-c8a9a9e92696" class="code code-wrap"><code class="language-C++" style="white-space:pre-wrap;word-break:break-all">// Software Prefetch
+inline void vx_prefetch(const void* addr) {
+    __asm__ volatile (&quot;.insn r %0, 0, 5, x0, %1, x0&quot; :: &quot;i&quot;(RISCV_CUSTOM0), &quot;r&quot;(addr) : &quot;memory&quot;);
+}</code></pre><p id="287c2bbf-ba00-80eb-9ca0-e24f7b58959c" class="">This will create a new group for the prefetch instruction, where this instruction is an R-type instruction format</p><h2 id="287c2bbf-ba00-8023-8bba-dd67b9839dc8" class="">Step 2: Implement into SimX</h2><h3 id="287c2bbf-ba00-808d-9182-faa13b482c1b" class="">2a: Editing <code>types.h</code></h3><p id="287c2bbf-ba00-803e-b313-e97e4c882fe7" class="">Before we can decode the instruction, we need to add a new <code>PREFETCH</code> value into <code>LsuType</code> in the file <code>/sim/simx/types.h</code> </p><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="287c2bbf-ba00-808d-8dbc-d3c1ca9818b9" class="code code-wrap"><code class="language-C++" style="white-space:pre-wrap;word-break:break-all">enum class LsuType {
+  LOAD,
+  STORE,
+  FENCE,
+  PREFETCH  // ADD
+};</code></pre><p id="287c2bbf-ba00-8098-9359-d9cb215b551f" class="">We also need a prefetch case for <code>std::ostream</code> </p><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="287c2bbf-ba00-80b1-b1c1-ded7150f2ceb" class="code code-wrap"><code class="language-C++" style="white-space:pre-wrap;word-break:break-all">inline std::ostream &amp;operator&lt;&lt;(std::ostream &amp;os, const LsuType&amp; type) {
+  switch (type) {
+  case LsuType::LOAD:     os &lt;&lt; &quot;LOAD&quot;; break;
+  case LsuType::STORE:    os &lt;&lt; &quot;STORE&quot;; break;
+  case LsuType::FENCE:    os &lt;&lt; &quot;FENCE&quot;; break;
+  case LsuType::PREFETCH: os &lt;&lt; &quot;PREFETCH&quot;; break;  // ADD
+  default:
+    assert(false);
+  }
+  return os;
+}</code></pre><h3 id="287c2bbf-ba00-8026-ab88-f6a38dada2df" class="">2b: Editing <code>decode.cpp</code></h3><p id="287c2bbf-ba00-8007-a9d5-dbcdc80d6973" class="">We want to update <code>case Opcode::EXT1:</code> (in the <code>/sim/simx/decode.cpp</code> file) where we add the new prefetch instruction group (right after the <code>case 2</code> instruction group)</p><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="287c2bbf-ba00-8013-bbf7-fc51955d1e44" class="code code-wrap"><code class="language-C++" style="white-space:pre-wrap;word-break:break-all">case 5: { // SOFTWARE PREFETCH
+	auto instr = std::allocate_shared&lt;Instr&gt;(instr_pool_, uuid, FUType::LSU);
+  switch (funct3) {
+	  case 0: // PREFETCH
+	    instr-&gt;setOpType(LsuType::PREFETCH);  // Make sure it is set to PREFETCH
+	    instr-&gt;setArgs(IntrLsuArgs{0, 0, 0});
+	    instr-&gt;setSrcReg(0, rs1, RegType::Integer);
+	    break;
+    default:
+      std::abort();
+  }
+  ibuffer.push_back(instr);
+} break;</code></pre><p id="287c2bbf-ba00-801b-84ff-d1a899f825b8" class="">In the <code>op_string()</code> function, we need to add a <code>PREFETCH</code> case (under the <code>FENCE</code> case)</p><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="287c2bbf-ba00-801b-abca-d91674fcfc51" class="code code-wrap"><code class="language-C++" style="white-space:pre-wrap;word-break:break-all">case LsuType::PREFETCH: return {&quot;PREFETCH&quot;, &quot;&quot;};  // ADD</code></pre><h3 id="287c2bbf-ba00-8007-840d-d5e65be70bfc" class="">2c: Editing execute.cpp</h3><p id="287c2bbf-ba00-80a5-b804-cb638f700793" class="">In order for the instruction to perform a prefetch, we need to add a case for <code>PREFETCH</code> in the <code>execute()</code> function (in the <code>/sim/simx/execute.cpp</code> file)</p><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="287c2bbf-ba00-801c-8f1d-defef3ae2d7b" class="code code-wrap"><code class="language-C++" style="white-space:pre-wrap;word-break:break-all">case LsuType::PREFETCH: {
+    auto trace_data = std::make_shared&lt;LsuTraceData&gt;(num_threads);
+    trace-&gt;data = trace_data;
+    
+    for (uint32_t t = thread_start; t &lt; num_threads; ++t) {
+        if (!warp.tmask.test(t))
+            continue;
+        uint64_t prefetch_addr = rs1_data[t].u;
+        
+        // Record the prefetch address in trace
+        trace_data-&gt;mem_addrs.at(t) = {prefetch_addr, 4}; // 4 bytes or cache line size
+        
+        // Issue dummy read to populate cache
+        uint32_t dummy;
+        this-&gt;dcache_read(&amp;dummy, prefetch_addr, sizeof(uint32_t));
+        
+        DP(2, &quot;PREFETCH: addr=0x&quot; &lt;&lt; std::hex &lt;&lt; prefetch_addr &lt;&lt; std::dec &lt;&lt; &quot; (thread &quot; &lt;&lt; t &lt;&lt; &quot;)&quot;);
+    }
+} break;</code></pre><p id="287c2bbf-ba00-80d3-a174-e6c2c3af7088" class="">In this implementation, we issue a dummy read in order to populate a cache. This will trigger SimX to place data (from an address) into cache, essentially prefetching the data. The instruction will not modify or perform anything outside of that.</p><h2 id="287c2bbf-ba00-80f1-9ecb-c7a7bde75a0f" class="">Step 3: Creating Test Application</h2><h3 id="287c2bbf-ba00-8033-8d20-e42bc273d7aa" class="">3a: Creating Test Directory</h3><p id="287c2bbf-ba00-80f5-8f84-f8b4e832fbb3" class="">In <code>/tests/regression/</code>, we want to duplicate the <code>fence</code> folder and rename it to <code>prefetch</code> </p><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="287c2bbf-ba00-804e-b061-f622f8776e0c" class="code code-wrap"><code class="language-Bash" style="white-space:pre-wrap;word-break:break-all"># Create prefetch test from fence test
+cp -r tests/regression/fence tests/regression/prefetch
+cd tests/regression/prefetch
+
+# Modify the Makefile
+sed -i &#x27;s/PROJECT=fence/PROJECT=prefetch/g&#x27; Makefile</code></pre><p id="287c2bbf-ba00-801a-8aa1-c9b3635c48c8" class="">You should now have the <code>/tests/regression/prefetch</code> directory, this will be our testing directory for our new instruction</p><p id="287c2bbf-ba00-8012-8201-f03d010705e5" class=""><strong>Note:</strong> When cloning, make sure you go into <code>Makefile</code> and adjust the project name to <code>prefetch</code></p><h3 id="287c2bbf-ba00-8086-83d5-d4be658ceaff" class="">3b: Modify Test Script</h3><p id="287c2bbf-ba00-805d-9999-c9e8cf4d93c4" class="">We will need to modify <code>kernel.cpp</code> (in the testing directory) and add a call to <code>vx_prefetch()</code> </p><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="287c2bbf-ba00-8013-8cb0-e9f57d4b56cf" class="code code-wrap"><code class="language-C++" style="white-space:pre-wrap;word-break:break-all">#include &lt;vx_spawn.h&gt;
+#include &lt;vx_intrinsics.h&gt;  // ADD
+#include &quot;common.h&quot;
+
+void kernel_body(kernel_arg_t* __UNIFORM__ arg) {
+	uint32_t count    = arg-&gt;task_size;
+	int32_t* src0_ptr = (int32_t*)arg-&gt;src0_addr;
+	int32_t* src1_ptr = (int32_t*)arg-&gt;src1_addr;
+	int32_t* dst_ptr  = (int32_t*)arg-&gt;dst_addr;
+
+	uint32_t offset = blockIdx.x * count;
+	for (uint32_t i = 0; i &lt; count; ++i) {
+		// ADD
+		vx_prefetch(&amp;src0_ptr[offset + i]);
+		vx_prefetch(&amp;src1_ptr[offset + i]);
+		
+		dst_ptr[offset+i] = src0_ptr[offset+i] + src1_ptr[offset+i];
+	}
+
+	vx_fence();
+}
+
+int main() {
+	kernel_arg_t* arg = (kernel_arg_t*)csr_read(VX_CSR_MSCRATCH);
+	return vx_spawn_threads(1, &amp;arg-&gt;num_tasks, nullptr, (vx_kernel_func_cb)kernel_body, arg);
+}</code></pre><h3 id="287c2bbf-ba00-801d-804f-dbaa1149d53f" class="">3c: Building and Testing</h3><p id="287c2bbf-ba00-8066-aa05-d22aa1a70d7d" class="">To check and see that the new instruction is working, run the following commands in your <code>/build/</code> directory</p><p id="287c2bbf-ba00-804a-bdf5-dc6b49bacb86" class=""><strong>Note:</strong> Check to see if you ran <code>source ./ci/toolchain_env.sh</code> before building!</p><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="287c2bbf-ba00-8023-b1a1-cc42782f2abb" class="code code-wrap"><code class="language-Bash" style="white-space:pre-wrap;word-break:break-all"># Make the build
+make -s
+
+# Run debug to check to see if prefetch output is printed
+./ci/blackbox.sh --driver=simx --cores=1 --app=prefetch --debug=2</code></pre><p id="287c2bbf-ba00-80a9-8e98-feb7b9ba1502" class="">All output will be in <code>run.log</code> in the <code>/build/</code> directory, check to see if <code>DEBUG PREFETCH: …</code> is present</p><h1 id="287c2bbf-ba00-8035-b90c-cdded7a06bd9" class="">Part 2: Implementing Performance Counters</h1><p id="287c2bbf-ba00-80b3-b0ab-d1d0464b6372" class="">Now that you have prefetch instructions working in SimX, we want to implement the three performance counters to measure prefetch effectiveness</p><h2 id="287c2bbf-ba00-8029-865d-f7db2032860d" class="">Step 1: Adding Prefetch Flags</h2><h3 id="287c2bbf-ba00-8048-abed-ea57f6e546e1" class="">1a: Editing <code>types.h</code></h3><p id="287c2bbf-ba00-8056-90fa-f100dea7086d" class="">We want to add the <code>is_prefetch</code> flag to <code>LsuReq</code> (in the <code>/sim/simx/types.h</code> directory)</p><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="287c2bbf-ba00-80d6-87e3-cc28f049a87c" class="code code-wrap"><code class="language-C++" style="white-space:pre-wrap;word-break:break-all">struct LsuReq {
+  BitVector&lt;&gt; mask;
+  std::vector&lt;uint64_t&gt; addrs;
+  bool     write;
+  uint32_t tag;
+  uint32_t cid;
+  uint64_t uuid;
+  bool     is_prefetch;  // ADD
+
+  LsuReq(uint32_t size)
+    : mask(size)
+    , addrs(size, 0)
+    , write(false)
+    , tag(0)
+    , cid(0)
+    , uuid(0)
+    , is_prefetch(false)  // ADD
+  {}
+
+  friend std::ostream &amp;operator&lt;&lt;(std::ostream &amp;os, const LsuReq&amp; req) {
+    os &lt;&lt; &quot;rw=&quot; &lt;&lt; req.write &lt;&lt; &quot;, mask=&quot; &lt;&lt; req.mask &lt;&lt; &quot;, addr={&quot;;
+    bool first_addr = true;
+    for (size_t i = 0; i &lt; req.mask.size(); ++i) {
+      if (!first_addr) os &lt;&lt; &quot;, &quot;;
+      first_addr = false;
+      if (req.mask.test(i)) {
+        os &lt;&lt; &quot;0x&quot; &lt;&lt; std::hex &lt;&lt; req.addrs.at(i) &lt;&lt; std::dec;
+      } else {
+        os &lt;&lt; &quot;-&quot;;
+      }
+    }
+    os &lt;&lt; &quot;}, tag=0x&quot; &lt;&lt; std::hex &lt;&lt; req.tag &lt;&lt; std::dec &lt;&lt; &quot;, cid=&quot; &lt;&lt; req.cid;
+    if (req.is_prefetch) os &lt;&lt; &quot;, prefetch=1&quot;;  // ADD
+    os &lt;&lt; &quot; (#&quot; &lt;&lt; req.uuid &lt;&lt; &quot;)&quot;;
+    return os;
+  }
+};</code></pre><p id="287c2bbf-ba00-80ca-b661-ce14552823ee" class="">Similarly, we will add the same flag to <code>MemReq</code> </p><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="287c2bbf-ba00-80ac-9841-f4e13e005c39" class="code code-wrap"><code class="language-C++" style="white-space:pre-wrap;word-break:break-all">struct MemReq {
+  uint64_t addr;
+  bool     write;
+  AddrType type;
+  uint32_t tag;
+  uint32_t cid;
+  uint64_t uuid;
+  bool     is_prefetch;  // ADD
+
+  MemReq(uint64_t _addr = 0,
+          bool _write = false,
+          AddrType _type = AddrType::Global,
+          uint64_t _tag = 0,
+          uint32_t _cid = 0,
+          uint64_t _uuid = 0,
+          bool _is_prefetch = false  // ADD
+  ) : addr(_addr)
+    , write(_write)
+    , type(_type)
+    , tag(_tag)
+    , cid(_cid)
+    , uuid(_uuid)
+    , is_prefetch(_is_prefetch)  // ADD
+  {}
+
+  friend std::ostream &amp;operator&lt;&lt;(std::ostream &amp;os, const MemReq&amp; req) {
+    os &lt;&lt; &quot;rw=&quot; &lt;&lt; req.write &lt;&lt; &quot;, &quot;;
+    os &lt;&lt; &quot;addr=0x&quot; &lt;&lt; std::hex &lt;&lt; req.addr &lt;&lt; std::dec &lt;&lt; &quot;, type=&quot; &lt;&lt; req.type;
+    os &lt;&lt; &quot;, tag=0x&quot; &lt;&lt; std::hex &lt;&lt; req.tag &lt;&lt; std::dec &lt;&lt; &quot;, cid=&quot; &lt;&lt; req.cid;
+    if (req.is_prefetch) os &lt;&lt; &quot;, prefetch=1&quot;;  // ADD
+    os &lt;&lt; &quot; (#&quot; &lt;&lt; req.uuid &lt;&lt; &quot;)&quot;;
+    return os;
+  }
+};</code></pre><h3 id="287c2bbf-ba00-802c-9385-cffe3e24480a" class="">1b: Editing <code>func_unit.cpp</code></h3><p id="287c2bbf-ba00-8046-896a-c55a1ff7ef70" class="">We need a way to mark prefetch requests in <code>LsuUnit::tick()</code> (in the <code>/sim/simx/func_unit.cpp</code> file), so we need to add functionality to our newly added <code>is_prefetch</code> flag</p><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="287c2bbf-ba00-80ed-bcfe-deb500872f43" class="code code-wrap"><code class="language-C++" style="white-space:pre-wrap;word-break:break-all">void LsuUnit::tick() {
+    // ...
+    
+    for (uint32_t iw = 0; iw &lt; ISSUE_WIDTH; ++iw) {
+        // ...
+        
+        bool is_fence = false;
+        bool is_write = false;
+        bool is_prefetch = false;  // ADD
+
+        auto trace = input.front();
+        if (std::get_if&lt;LsuType&gt;(&amp;trace-&gt;op_type)) {
+            auto lsu_type = std::get&lt;LsuType&gt;(trace-&gt;op_type);
+            is_fence = (lsu_type == LsuType::FENCE);
+            is_write = (lsu_type == LsuType::STORE);
+            is_prefetch = (lsu_type == LsuType::PREFETCH);  // ADD
+        }
+        // ...
+        
+        if (remain_addrs_ != 0) {
+            // setup memory request
+            LsuReq lsu_req(NUM_LSU_LANES);
+            lsu_req.write = is_write;
+            lsu_req.is_prefetch = is_prefetch;  // ADD
+            
+            // ...
+        }
+    }
+}</code></pre><h3 id="288c2bbf-ba00-80ea-99bc-cd8d450e632f" class="">1c: Editing <code>cache_sim.cpp</code></h3><p id="288c2bbf-ba00-8094-95f7-e835c31ba81e" class="">To mimic an additional bit on the tag, we also add flag bits to the <code>line_t</code> structure (in the <code>/sim/simx/cache_sim.cpp</code>), specifically one to check if the data was prefetched and the other if it was used. These two flags will assist the counter with tracking</p><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="288c2bbf-ba00-807e-be32-e49005a90add" class="code code-wrap"><code class="language-C++" style="white-space:pre-wrap;word-break:break-all">struct line_t {
+    uint64_t tag;
+    uint32_t lru_ctr;
+    bool     valid;
+    bool     dirty;
+    bool     was_prefetched;  // ADD
+    bool     was_used;        // ADD
+
+    void reset() {
+        valid = false;
+        dirty = false;
+        was_prefetched = false;  // ADD
+        was_used = false;        // ADD
+    }
+};</code></pre><p id="288c2bbf-ba00-80ae-993a-e2756aaf527b" class="">Afterwards, we also need to update <code>bank_req_t</code> with the prefetch flag</p><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="288c2bbf-ba00-8051-a135-c25097957326" class="code code-wrap"><code class="language-C++" style="white-space:pre-wrap;word-break:break-all">struct bank_req_t {
+    
+    // ...
+    
+    bool     is_prefetch;  // ADD
+
+    bank_req_t() {
+        this-&gt;reset();
+    }
+
+    void reset() {
+        type = ReqType::None;
+        is_prefetch = false;  // ADD
+    }
+
+    friend std::ostream &amp;operator&lt;&lt;(std::ostream &amp;os, const bank_req_t&amp; req) {
+        os &lt;&lt; &quot;set=&quot; &lt;&lt; req.set_id &lt;&lt; &quot;, rw=&quot; &lt;&lt; req.write;
+        os &lt;&lt; &quot;, type=&quot; &lt;&lt; req.type;
+        os &lt;&lt; &quot;, addr_tag=0x&quot; &lt;&lt; std::hex &lt;&lt; req.addr_tag;
+        os &lt;&lt; &quot;, req_tag=&quot; &lt;&lt; req.req_tag;
+        os &lt;&lt; &quot;, cid=&quot; &lt;&lt; std::dec &lt;&lt; req.cid;
+        if (req.is_prefetch) os &lt;&lt; &quot;, prefetch=1&quot;;  // ADD
+        os &lt;&lt; &quot; (#&quot; &lt;&lt; req.uuid &lt;&lt; &quot;)&quot;;
+        return os;
+    }
+};</code></pre><p id="288c2bbf-ba00-8080-8d30-e543928993e5" class="">Now that we have the flags set in <code>cache_sim.cpp</code>, we want to implement logic into the <code>processInputs()</code> function</p><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="288c2bbf-ba00-8079-8cb1-d6a0e704d14b" class="code code-wrap"><code class="language-C++" style="white-space:pre-wrap;word-break:break-all">void processInputs() {
+    // ...
+    
+    // second: schedule memory fill
+		if (!this-&gt;mem_rsp_port.empty()) {
+			auto&amp; mem_rsp = mem_rsp_port.front();
+			DT(3, this-&gt;name() &lt;&lt; &quot;-fill-rsp: &quot; &lt;&lt; mem_rsp);
+			// update MSHR
+			auto&amp; entry = mshr_.replay(mem_rsp.tag);
+			auto&amp; set   = sets_.at(entry.bank_req.set_id);
+			auto&amp; line  = set.lines.at(entry.line_id);
+			line.valid  = true;
+			line.tag    = entry.bank_req.addr_tag;
+			line.was_prefetched = entry.bank_req.is_prefetch;  // ADD
+    	
+    	// ...
+		}
+    
+    // third: schedule core request
+    if (!this-&gt;core_req_port.empty()) {
+      auto&amp; core_req = core_req_port.front();
+        
+      // ...
+        
+      bank_req.type = bank_req_t::Core;
+      bank_req.cid = core_req.cid;
+      bank_req.uuid = core_req.uuid;
+      bank_req.set_id = params_.addr_set_id(core_req.addr);
+      bank_req.addr_tag = params_.addr_tag(core_req.addr);
+      bank_req.req_tag = core_req.tag;
+      bank_req.write = core_req.write;
+      bank_req.is_prefetch = core_req.is_prefetch;  // ADD
+        
+      // ...
+    }
+}</code></pre><h3 id="287c2bbf-ba00-805c-bb77-c2142c10e828" class="">1d: Editing <code>types.cpp</code></h3><p id="287c2bbf-ba00-80a7-a592-c2217b846573" class="">Now we want to propagate <code>is_prefetch</code> through <code>LsuMemAdapter</code> (in the <code>/sim/simx/types.cpp</code> file) so that the counter can see the flag</p><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="287c2bbf-ba00-802d-b060-fcdeb1f8507e" class="code code-wrap"><code class="language-C++" style="white-space:pre-wrap;word-break:break-all">// process incoming requests
+  if (!ReqIn.empty()) {
+    auto&amp; in_req = ReqIn.front();
+    assert(in_req.mask.size() == input_size);
+    for (uint32_t i = 0; i &lt; input_size; ++i) {
+      if (in_req.mask.test(i)) {
+        // build memory request
+        MemReq out_req;
+        out_req.write = in_req.write;
+        out_req.addr  = in_req.addrs.at(i);
+        out_req.is_prefetch = in_req.is_prefetch; // ADD
+        out_req.type  = get_addr_type(in_req.addrs.at(i));
+        out_req.tag   = in_req.tag;
+        out_req.cid   = in_req.cid;
+        out_req.uuid  = in_req.uuid;
+        // send memory request
+        ReqOut.at(i).push(out_req, delay_);
+        DT(4, this-&gt;name() &lt;&lt; &quot;-req&quot; &lt;&lt; i &lt;&lt; &quot;: &quot; &lt;&lt; out_req);
+      }
+    }
+    ReqIn.pop();
+  }</code></pre><h2 id="287c2bbf-ba00-8000-979e-ccf25391a96f" class="">Step 2: Adding Counters</h2><p id="288c2bbf-ba00-806d-a98f-e89ebdab4db1" class="">We want to add all three prefetch counters into the <code>PerfStats</code> structure (in the <code>/sim/simx/cache_sim.h</code> file)</p><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="288c2bbf-ba00-806f-a19a-c4262f96ee2c" class="code code-wrap"><code class="language-C++" style="white-space:pre-wrap;word-break:break-all">struct PerfStats {
+    uint64_t reads;
+    uint64_t writes;
+    uint64_t read_misses;
+    uint64_t write_misses;
+    uint64_t evictions;
+    uint64_t bank_stalls;
+    uint64_t mshr_stalls;
+    uint64_t mem_latency;
+    
+    uint64_t prefetch_requests;  // ADD
+    uint64_t prefetch_unused;    // ADD
+    uint64_t prefetch_late;      // ADD
+
+    PerfStats()
+        : reads(0)
+        , writes(0)
+        , read_misses(0)
+        , write_misses(0)
+        , evictions(0)
+        , bank_stalls(0)
+        , mshr_stalls(0)
+        , mem_latency(0)
+        , prefetch_requests(0)   // ADD
+        , prefetch_unused(0)     // ADD
+        , prefetch_late(0)       // ADD
+    {}
+
+    PerfStats&amp; operator+=(const PerfStats&amp; rhs) {
+        this-&gt;reads += rhs.reads;
+        this-&gt;writes += rhs.writes;
+        this-&gt;read_misses += rhs.read_misses;
+        this-&gt;write_misses += rhs.write_misses;
+        this-&gt;evictions += rhs.evictions;
+        this-&gt;bank_stalls += rhs.bank_stalls;
+        this-&gt;mshr_stalls += rhs.mshr_stalls;
+        this-&gt;mem_latency += rhs.mem_latency;
+        this-&gt;prefetch_requests += rhs.prefetch_requests;  // ADD
+        this-&gt;prefetch_unused += rhs.prefetch_unused;      // ADD
+        this-&gt;prefetch_late += rhs.prefetch_late;          // ADD
+        return *this;
+    }
+};</code></pre><p id="288c2bbf-ba00-8075-941b-ced825aae0fd" class="">To implement functionality, we add counter logic in the <code>processRequests()</code> function (in the <code>/sim/simx/cache_sim.cpp</code> file)</p><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="288c2bbf-ba00-8001-829b-d7c7f145be70" class="code code-wrap"><code class="language-C++" style="white-space:pre-wrap;word-break:break-all">void processRequests() {
+    if (pipe_req_-&gt;empty())
+        return;
+    auto bank_req = pipe_req_-&gt;front();
+
+    switch (bank_req.type) {
+    
+    // ...
+
+    case bank_req_t::Core: {
+        
+        // ...
+        
+        if (hit_line_id != -1) {
+        
+            // ...
+            
+        } else {
+            // MISS
+            if (bank_req.write &amp;&amp; !bank_req.is_prefetch) {
+                ++perf_stats_.write_misses;
+            } else if (!bank_req.is_prefetch) {
+                ++perf_stats_.read_misses;
+            }
+            
+            // Counter 1: Count unique prefetch requests that miss
+            if (bank_req.is_prefetch) {
+                ++perf_stats_.prefetch_requests;
+            }
+
+            // Check if there&#x27;s already a pending MSHR for this address
+            auto mshr_pending = mshr_.lookup(bank_req);
+            
+            // Counter 3: Late prefetch (demand arrives while prefetch in MSHR)
+            if (!bank_req.is_prefetch &amp;&amp; mshr_pending) {
+                ++perf_stats_.prefetch_late;
+            }
+
+            if (free_line_id == -1 &amp;&amp; config_.write_back) {
+                // write back dirty line
+                auto&amp; repl_line = set.lines.at(repl_line_id);
+                
+                // Counter 2: Unused prefetch (evicting prefetched but unused line)
+                if (repl_line.was_prefetched &amp;&amp; !repl_line.was_used) {
+                    ++perf_stats_.prefetch_unused;
+                }
+                
+                if (repl_line.dirty) {
+                    MemReq mem_req;
+                    mem_req.addr  = params_.mem_addr(bank_id_, bank_req.set_id, repl_line.tag);
+                    mem_req.write = true;
+                    mem_req.cid   = bank_req.cid;
+                    this-&gt;mem_req_port.push(mem_req);
+                    DT(3, this-&gt;name() &lt;&lt; &quot;-writeback: &quot; &lt;&lt; mem_req);
+                    ++perf_stats_.evictions;
+                }
+            }
+
+            // ...
+        }
+    } break;
+    
+    // ...
+}</code></pre><h2 id="288c2bbf-ba00-80a1-82a3-f7f1bf2087b1" class="">Step 3: Printing Results</h2><h3 id="288c2bbf-ba00-80c8-a01c-d23878145d31" class="">3a: Editing <code>VX_types.vh</code></h3><p id="288c2bbf-ba00-80af-a036-c4f1019b5865" class="">In order to print the results, we first need to add three new CSR definitions into <code>VX_types.vh</code> (in the <code>/hw/rtl/</code> directory)</p><p id="288c2bbf-ba00-80c1-84b5-cb3ec13595bc" class=""><strong>Note: </strong>Despite this assignment focusing on SimX (C++), we are editing a <code>*.vh</code> file. This file creates a <code>VX_types.h</code> file that’s in the <code>/build/hw/</code> directory (after making the build)</p><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="288c2bbf-ba00-80fc-ac57-f5d18df0a3d5" class="code code-wrap"><code class="language-Verilog" style="white-space:pre-wrap;word-break:break-all">`define VX_CSR_MPM_PREFETCH_REQ     12&#x27;hB20     // unique prefetch requests
+`define VX_CSR_MPM_PREFETCH_REQ_H   12&#x27;hBA0
+`define VX_CSR_MPM_PREFETCH_UNUSED  12&#x27;hB21     // unused prefetches
+`define VX_CSR_MPM_PREFETCH_UNUSED_H 12&#x27;hBA1
+`define VX_CSR_MPM_PREFETCH_LATE    12&#x27;hB22     // late prefetches
+`define VX_CSR_MPM_PREFETCH_LATE_H  12&#x27;hBA2</code></pre><h3 id="288c2bbf-ba00-8090-80db-e2d5a4bb4b57" class="">3b: Editing <code>utils.cpp</code></h3><p id="288c2bbf-ba00-8009-aa4d-ca9e79f4fd10" class="">To have <code>PERF: …</code> line at the end of the test, we need to add output logic within the <code>dcache_enable</code> if statement (in the <code>/runtime/stub/utils.cpp</code> file) with our newly added counters</p><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="288c2bbf-ba00-8028-abe2-e5139e94ad37" class="code code-wrap"><code class="language-C++" style="white-space:pre-wrap;word-break:break-all">// ...
+
+// PERF: Prefetch counters
+uint64_t prefetch_requests;
+CHECK_ERR(vx_mpm_query(hdevice, VX_CSR_MPM_PREFETCH_REQ, core_id, &amp;prefetch_requests), {
+return err;
+});
+uint64_t prefetch_unused;
+CHECK_ERR(vx_mpm_query(hdevice, VX_CSR_MPM_PREFETCH_UNUSED, core_id, &amp;prefetch_unused), {
+return err;
+});
+uint64_t prefetch_late;
+CHECK_ERR(vx_mpm_query(hdevice, VX_CSR_MPM_PREFETCH_LATE, core_id, &amp;prefetch_late), {
+return err;
+});
+fprintf(stream, &quot;PERF: core%d: dcache prefetch requests=%ld\n&quot;, core_id, prefetch_requests);
+fprintf(stream, &quot;PERF: core%d: dcache prefetch unused=%ld\n&quot;, core_id, prefetch_unused);
+fprintf(stream, &quot;PERF: core%d: dcache prefetch late=%ld\n&quot;, core_id, prefetch_late);
+
+// ...</code></pre><h3 id="288c2bbf-ba00-80ef-a923-ccc8904837d5" class="">3c: Editing <code>emulator.cpp</code></h3><p id="288c2bbf-ba00-805b-a93f-d4be596ec6eb" class="">Because our addresses are extended outside of the CSR address range, we need to expand it from 32 to 64 bits in the <code>user-defined MPM CSRs</code> section (in the <code>/sim/simx/emulator.cpp</code> directory)</p><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="288c2bbf-ba00-8077-9f11-c55e927ff001" class="code code-wrap"><code class="language-C++" style="white-space:pre-wrap;word-break:break-all">// ...
+
+if ((addr &gt;= VX_CSR_MPM_BASE &amp;&amp; addr &lt; (VX_CSR_MPM_BASE + 64)) // CHANGE
+ || (addr &gt;= VX_CSR_MPM_BASE_H &amp;&amp; addr &lt; (VX_CSR_MPM_BASE_H + 64)))
+ 
+// ...</code></pre><h3 id="288c2bbf-ba00-808e-8e84-d3bdcde0a685" class="">3d: Editing <code>vortex.cpp</code></h3><p id="288c2bbf-ba00-801e-9517-c9779815e149" class="">Similarly, we need to edit the <code>mpm_query()</code> function to support an extended address range (in the <code>/runtime/simx/vortex.cpp</code> file)</p><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="288c2bbf-ba00-80ee-aeab-d0d89b006617" class="code code-wrap"><code class="language-C++" style="white-space:pre-wrap;word-break:break-all">// ...
+
+int mpm_query(uint32_t addr, uint32_t core_id, uint64_t *value) {
+  uint32_t offset = addr - VX_CSR_MPM_BASE;
+  if (offset &gt; 63)  // CHANGE 1
+    return -1;
+  if (mpm_cache_.count(core_id) == 0) {
+    uint64_t mpm_mem_addr = IO_MPM_ADDR + core_id * 64 * sizeof(uint64_t);  // CHANGE 2
+    CHECK_ERR(this-&gt;download(mpm_cache_[core_id].data(), mpm_mem_addr, 64 * sizeof(uint64_t)), {  // CHANGE 3
+      return err;
+    });
+  }
+  *value = mpm_cache_.at(core_id).at(offset);
+  return 0;
+}
+
+// ...</code></pre><h2 id="288c2bbf-ba00-8009-8583-e36a14c3e09b" class="">Verification and Testing:</h2><p id="288c2bbf-ba00-8006-9196-cfed859ff96c" class="">To test your changes, you can run the following to build and verify prefetch functionality</p><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="288c2bbf-ba00-80d1-8aef-c56dbe8e3408" class="code code-wrap"><code class="language-Bash" style="white-space:pre-wrap;word-break:break-all"># Make the build
+make -s
+
+# Test with SimX
+./ci/blackbox.sh --driver=simx --cores=1 --app=prefetch --perf=2</code></pre><p id="288c2bbf-ba00-80cd-aa72-cbe2d1dcce7e" class="">The expected result is a test passed message and an output of all 3 metric counters, feel free to change <code>kernel.cpp</code> with different instruction/data sizes to observe prefetch efficiency</p><p id="288c2bbf-ba00-8064-9e56-edf0ed6b7922" class="">
+</p></div></article><span class="sans" style="font-size:14px;padding-top:2em"></span></body></html>
