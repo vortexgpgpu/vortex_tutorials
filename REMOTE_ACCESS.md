@@ -6,7 +6,7 @@ We suggest that you use a remote server hosted by the [CRNCH Rogues Gallery](htt
 Please use the [form to submit your Github ID](https://forms.office.com/r/CynuGzyeDD) to reserve a slot to use for the duration of the tutorial.
 
 ## Login
-Login to `rg-hub.crnch.gatech.edu/jupyter` using your Github account.
+Login to `crush.crnch.gatech.edu/jupyter` using your Github account.
 
  | **Note:** Participants have to agree / authorize to join the "gt-crnch-rg" team to get access. We do not get the password; This is just the authentication from GitHub that the user is a valid user.
 
