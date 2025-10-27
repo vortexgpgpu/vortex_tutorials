@@ -144,6 +144,20 @@ case AluType::DOT8:
 
 ### Step 4: Testing
 
+To test your changes, you can run the following to build and verify dot8 functionality
+
+```bash
+# Build the new dot8 regression test
+make -C tests/regression/dot8
+
+# Make the build
+make -s
+
+# Test with SimX
+./ci/blackbox.sh --driver=simx --cores=4 --warps=4 --threads=4 --app=dot8
+```
+
 You will compare your new accelerated dot8 program with a corresponding baseline int8_t kernel.
 You will use N=256 and (warps=4, threads=4), (warps=4, threads=8), (warps=8, threads=4), and (warps=8, threads=8) on a 4-core GPU.
 Plot the total instruction count and execution cycles to observe the performance improvement.
+
