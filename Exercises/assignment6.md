@@ -222,9 +222,22 @@ module VX_alu_dot8 import VX_gpu_pkg::*; #(
 endmodule
 ```
 
-- Update `hw/rtl/core/VX_alu_unit.sv` to add your new VX_alu_dot8 instance as a 3rd sub-unit after `VX_alu_muldiv`.
+- Update `hw/rtl/core/VX_alu_unit.sv` to add your new VX_alu_dot8 instance as a 3rd sub-unit after `VX_alu_muldiv` along with the extra control logic in order to enable the new VX_alu_dot8 instance.
 
 ### Step 4: Testing
+
+To test your changes, you can run the following to build and verify dot8 functionality
+
+```bash
+# Build the new dot8 regression test
+make -C tests/regression/dot8
+
+# Make the build
+make -s
+
+# Test with SimX
+./ci/blackbox.sh --driver=rtlsim --cores=4 --warps=4 --threads=4 --app=dot8
+```
 
 You will compare your new accelerated dot8 program with a corresponding baseline int8_t kernel.
 You will use N=256 and (warps=4, threads=4), (warps=4, threads=8), (warps=8, threads=4), and (warps=8, threads=8) on a 4-core GPU.

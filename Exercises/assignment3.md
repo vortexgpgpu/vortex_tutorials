@@ -700,16 +700,16 @@ In order to print the results, we first need to add three new CSR definitions in
 `define VX_CSR_MPM_PREFETCH_LATE_H  12'hB97
 ```
 
-**IMPORTANT:** Because class 2 counters are full, we cannot add these counters within that class, adding these counters into that class will result in errors!
+**IMPORTANT:** Because class 2 counters are full, we cannot add these counters within that class, adding these counters into that class will result in errors!. Thus we are adding the counters in class 3.
 
 #### 3b: Editing `utils.cpp`
 
-To have `PERF: …` line at the end of the test, we need to add output logic within the `dcache_enable` if statement (in the `/runtime/stub/utils.cpp` file) with our newly added counters
+To have `PERF: …` line at the end of the test, we need to add output logic within the `dcache_enable` if statement (in the `/runtime/stub/utils.cpp` file) with our newly added counters in the 
 
 ```cpp
 // ...
 
-// PERF: Prefetch counters
+// PERF: Prefetch counters in class 3
 uint64_t prefetch_requests;
 CHECK_ERR(vx_mpm_query(hdevice, VX_CSR_MPM_PREFETCH_REQ, core_id, &prefetch_requests), {
 return err;
@@ -741,6 +741,25 @@ if ((addr >= VX_CSR_MPM_BASE && addr < (VX_CSR_MPM_BASE + 64)) // CHANGE
  
 // ...
 ```
+
+Also, we need to add the logic to expose these counters in the CSR in the class 3 case of the performance counters along with the logic to read and expose them:
+
+```cpp
+// ...
+case VX_DCR_MPM_CLASS_3: {
+  // Add your custom counters here for Class 3:
+  auto socket_perf = core_->socket()->perf_stats();
+          // Add your custom counters here for Class 3:
+          switch (addr) {
+          CSR_READ_64(VX_CSR_MPM_PREFETCH_REQ, socket_perf.dcache.prefetch_requests);
+          CSR_READ_64(VX_CSR_MPM_PREFETCH_UNUSED, socket_perf.dcache.prefetch_unused);
+          CSR_READ_64(VX_CSR_MPM_PREFETCH_LATE, socket_perf.dcache.prefetch_late);
+          }
+}
+// ...
+```
+
+
 
 #### 3d: Editing `vortex.cpp`
 

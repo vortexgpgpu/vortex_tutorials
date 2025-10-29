@@ -65,45 +65,7 @@ static PFN_FEDP select_FEDP(uint32_t IT, uint32_t OT) {
 
 This integrates TF32 into the Tensor Unit's execution path.
 
-### Step 4: Extend CPU Reference for TF32
-
-To verify your implementation, you need to update the existing sgemm_tcu regression test to add support for TF32 format.
-Add a Comparator specialization for TF32 to generate random values and compare results:
-
-```c++
-template <>
-class Comparator<vt::tf32> {
-public:
-  static uint32_t generate() {
-    auto fvalue = float(rand()) / RAND_MAX;
-    return rv_ftox_s(bit_cast<uint32_t>(fvalue), 8, 10, 0, nullptr);
-  }
-  static bool compare(uint32_t a, uint32_t b, int index, int errors) {
-    if (a != b) {
-      if (errors < MAX_ERRORS) {
-        printf("*** error: [%d] expected=0x%x, actual=0x%x\n", index, b, a);
-      }
-      return false;
-    }
-    return true;
-  }
-};
-```
-
-Add a muladd_t specialization for TF32 to handle the multiply-accumulate in the CPU matmul:
-
-```c++
-template <>
-struct muladd_t<vt::tf32, vt::fp32> {
-  static float eval(uint32_t a, uint32_t b, float c) {
-    // TODO:
-  }
-};
-```
-
-This ensures the matmul_cpu function can process TF32 inputs correctly.
-
-### Step 5: Testing
+### Step 4: Testing
 
 Before running TF32 tests, compile the regression app for your target format and GPU thread configuration. 
 The example below cleans the previous build and rebuilds with an **8‑thread GPU**, using **TF32 inputs** and **FP32 outputs**. 
@@ -120,6 +82,6 @@ CONFIGS="-DNUM_THREADS=8 -DITYPE=tf32 -DOTYPE=fp32" make -C tests/regression/sge
 CONFIGS="-DNUM_THREADS=8 -DEXT_TCU_ENABLE" ./ci/blackbox.sh --driver=simx --app=sgemm_tcu
 ```
 
-### Step 6 — Benchmark TF32 vs. FP16/BF16
+### Step 5 — Benchmark TF32 vs. FP16/BF16
 Using the same kernel and grid settings, measure **instruction counts** and **cycles** for `fp16`, `bf16`, and `tf32` (all accumulating to FP32). Use a 4‑core GPU and try configurations `(warps, threads) ∈ {(4,4), (4,8), (8,4), (8,8)}` with `N = 256`.
 Plot the total instruction count and execution cycles to observe the performance difference.
