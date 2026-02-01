@@ -794,7 +794,7 @@ To test your changes, you can run the following to build and verify prefetch fun
 make -s
 
 # Test with SimX
-./ci/blackbox.sh --driver=simx --cores=1 --app=prefetch --perf=1
+./ci/blackbox.sh --driver=simx --cores=1 --app=prefetch --perf=3
 ```
 
 The expected result is a test passed message and an output of all 3 metric counters, feel free to change `kernel.cpp` with different instruction/data sizes to observe prefetch efficiency
