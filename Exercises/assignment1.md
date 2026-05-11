@@ -1,5 +1,7 @@
 # Assignment #1: Warp Efficiency Performance Counter (SimX)
 
+> Targets Vortex release [v2.3](https://github.com/vortexgpgpu/vortex/releases/tag/v2.3).
+
 In this assignment, you will add two new machine performance monitoring (MPM) counters to the SimX cycle-level simulator to calculate the GPU **Warp Efficiency** after a kernel execution. These two counters, `total_issued_warps` and `total_active_threads`, will allow you to compute warp efficiency by dividing the number of active threads by the number of times a warp was issued for execution in the GPU pipeline.
 
 The Warp Efficiency can be computed as:
@@ -8,7 +10,7 @@ The Warp Efficiency can be computed as:
 \text{Warp Efficiency} = \frac{\text{total\_active\_threads}}{\text{total\_issued\_warps} \times \text{warp\_size}} \times 100
 ```
 
-Vortex already supports a few performance counters, and you can find the list in the file [/vortex/hw/rtl/VX_types.vh](https://github.com/vortexgpgpu/vortex/blob/master/hw/rtl/VX_types.vh).
+Vortex already supports a few performance counters, and you can find the list in the file [/vortex/hw/rtl/VX_types.vh](https://github.com/vortexgpgpu/vortex/blob/v2.3/hw/rtl/VX_types.vh).
 This Verilog header file is also used to describe the CSR registers for SimX.
 You will be adding two new counters for `total_issued_warps` and `total_active_threads`.
 
@@ -37,7 +39,7 @@ make -C hw
 
 ### Step 2: Register the Counters CSRs
 
-Next, you need to add logic to expose these counters in the CSR. In [emulator.cpp](https://github.com/vortexgpgpu/vortex/blob/master/sim/simx/emulator.cpp), add the new case for the new class of performance counters, along with the logic to read and expose them:
+Next, you need to add logic to expose these counters in the CSR. In [emulator.cpp](https://github.com/vortexgpgpu/vortex/blob/v2.3/sim/simx/emulator.cpp), add the new case for the new class of performance counters, along with the logic to read and expose them:
 
 ```c++
 case VX_DCR_MPM_CLASS_3: {
@@ -51,7 +53,7 @@ case VX_DCR_MPM_CLASS_3: {
 
 ### Step 3: Update the Performance Interface in core.h
 
-Modify the performance structure `PerfStats` in [core.h](https://github.com/vortexgpgpu/vortex/blob/master/sim/simx/core.h) to include the new counters:
+Modify the performance structure `PerfStats` in [core.h](https://github.com/vortexgpgpu/vortex/blob/v2.3/sim/simx/core.h) to include the new counters:
 
 ```c++
 struct PerfStats {
@@ -80,7 +82,7 @@ perf_stats_.total_active_threads += trace->tmask.count();
 
 ### Step 5: Expose the Counters in the Runtime
 
-In the `vx_dump_perf` function in [`vortex/runtime/stub/utils.cpp`](https://github.com/vortexgpgpu/vortex/blob/master/runtime/stub/utils.cpp#L159), retrieve the values for `total_issued_warps` and `total_active_threads` and use them to calculate warp efficiency.
+In the `vx_dump_perf` function in [`vortex/runtime/stub/utils.cpp`](https://github.com/vortexgpgpu/vortex/blob/v2.3/runtime/stub/utils.cpp#L159), retrieve the values for `total_issued_warps` and `total_active_threads` and use them to calculate warp efficiency.
 
 In `utils.cpp`, add the following code to fetch the values from the CSR and calculate warp efficiency:
 
@@ -91,7 +93,7 @@ uint64_t total_issued_warps = 0;
 uint64_t total_active_threads = 0;
 ```
 
-Then, add a new case for VX_DCR_MPM_CLASS_3 to calculate and print per-core Warp Efficiency in [`vortex/runtime/stub/utils.cpp`](https://github.com/vortexgpgpu/vortex/blob/master/runtime/stub/utils.cpp#L558):
+Then, add a new case for VX_DCR_MPM_CLASS_3 to calculate and print per-core Warp Efficiency in [`vortex/runtime/stub/utils.cpp`](https://github.com/vortexgpgpu/vortex/blob/v2.3/runtime/stub/utils.cpp#L558):
 ```cpp
     case VX_DCR_MPM_CLASS_3:
     {
@@ -127,7 +129,7 @@ Then, add a new case for VX_DCR_MPM_CLASS_3 to calculate and print per-core Warp
     break;
 ```
 
-and add the new case to calculate and print the total average Warp Efficiency of the GPU in [`vortex/runtime/stub/utils.cpp`](https://github.com/vortexgpgpu/vortex/blob/master/runtime/stub/utils.cpp#L638):
+and add the new case to calculate and print the total average Warp Efficiency of the GPU in [`vortex/runtime/stub/utils.cpp`](https://github.com/vortexgpgpu/vortex/blob/v2.3/runtime/stub/utils.cpp#L638):
 ```cpp
 case VX_DCR_MPM_CLASS_3: {
     uint64_t threads_per_warp;

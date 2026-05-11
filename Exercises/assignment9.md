@@ -1,5 +1,7 @@
 # Assignment #9: Tensor Core (TF32) Support in RTL
 
+> Targets Vortex release [v2.3](https://github.com/vortexgpgpu/vortex/releases/tag/v2.3).
+
 This assignment will introduce you to the Vortex Tensor Core architecture. 
 The Tensor Core in Vortex accelerates matrix multiply-accumulate (MMA) operations for machine learning workloads, supporting various input formats like fp16, bf16, int8, uint8, int4, and uint4. 
 Outputs are typically accumulated in fp32 or int32.

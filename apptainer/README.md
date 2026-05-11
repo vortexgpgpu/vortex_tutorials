@@ -1,5 +1,7 @@
 # Apptainer Build Process
 
+> **Note:** This tutorial targets Vortex release [v2.3](https://github.com/vortexgpgpu/vortex/releases/tag/v2.3).
+
 Prerequisite: Install `apptainer` package on your machine by following [INSTALL.md](./INSTALL.md)
 
 
@@ -11,7 +13,7 @@ $   mkdir -p tools
 ```
 
 ```
-$	git clone --depth=1 --recursive https://github.com/vortexgpgpu/vortex.git
+$	git clone --depth=1 --branch v2.3 --recursive https://github.com/vortexgpgpu/vortex.git
 ```
 
 Go to `apptainer` directory and build the vortex apptainer

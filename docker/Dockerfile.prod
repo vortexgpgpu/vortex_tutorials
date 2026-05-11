@@ -35,8 +35,9 @@ RUN apt-get upgrade && apt-get update
 # temporary until remote dependency script gets updated
 RUN apt-get install -y cmake
 
-# Clone the Vortex repository
-RUN git clone --depth=1 --recursive https://github.com/vortexgpgpu/vortex.git /vortex
+# Clone the Vortex repository (targets release v2.3:
+# https://github.com/vortexgpgpu/vortex/releases/tag/v2.3)
+RUN git clone --depth=1 --branch v2.3 --recursive https://github.com/vortexgpgpu/vortex.git /vortex
 
 # Set the initial working directory
 WORKDIR /vortex

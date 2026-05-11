@@ -1,5 +1,7 @@
 # Assignment #3: GPU Software Prefetching (SimX)
 
+> Targets Vortex release [v2.3](https://github.com/vortexgpgpu/vortex/releases/tag/v2.3).
+
 This assignment will be divided into two parts. The first part involves adding a new prefetch instruction as well as a corresponding flag bit to identify if it has been prefetched. The second involves adding three performance counters to measure the following:
 
 1. Number of unique prefetch requests to main memory

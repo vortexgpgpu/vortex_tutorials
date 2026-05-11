@@ -1,5 +1,7 @@
 # Assignment #7: How to Debug
 
+> Targets Vortex release [v2.3](https://github.com/vortexgpgpu/vortex/releases/tag/v2.3).
+
 In this assignment, we will learn how to debug for a hardware prefetching implementation.
 
 Tasks: compile Vortex using the debug flag and check (1) the prefetch requests are generated correctly (2) the prefetch requests are indeed used or not by comparing them with demand requests.
@@ -9,7 +11,7 @@ Tasks: compile Vortex using the debug flag and check (1) the prefetch requests a
 $ ./ci/blackbox.sh --driver=rtlsim --app=demo --debug=1
 ```
 A debug trace run.log is generated in the current directory during the program execution. The trace includes important states of the simulated processor (memory, caches, pipeline, stalls, etc..). A waveform trace trace.vcd is also generated in the current directory during the program execution. You can visualize the waveform trace using any tool that can open VCD files (Modelsim, Quartus, Vivado, etc..). [GTKwave](http://gtkwave.sourceforge.net) is a great open-source scope analyzer that also works with VCD files.
-Additional debugging information can be found [here](https://github.com/vortexgpgpu/vortex/blob/master/docs/debugging.md).
+Additional debugging information can be found [here](https://github.com/vortexgpgpu/vortex/blob/v2.3/docs/debugging.md).
 
 
 Example of what information run.log provides/what we should look for:

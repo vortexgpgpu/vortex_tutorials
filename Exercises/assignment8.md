@@ -1,5 +1,7 @@
 # Assignment #8: Tensor Core Extension (SimX)
 
+> Targets Vortex release [v2.3](https://github.com/vortexgpgpu/vortex/releases/tag/v2.3).
+
 This assignment will introduce you to the Vortex Tensor Core architecture. The Tensor Core in Vortex accelerates matrix multiply-accumulate (MMA) operations for machine learning workloads, supporting various input formats like fp16, bf16, int8, uint8, int4, and uint4. Outputs are typically accumulated in fp32 or int32.
 
 You will extend the framework to add support for a new input matrix format: TF32 (Tensor Float 32). TF32 is a 19-bit floating-point format (1 sign bit, 8 exponent bits, 10 mantissa bits) padded to 32 bits, offering higher precision than bf16 while maintaining similar performance characteristics. You will implement this extension in the SimX cycle-level simulator, focusing on the functional emulation of fused multiply-add (FMA) operations used in MMA.

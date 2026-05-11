@@ -1,5 +1,8 @@
 
 ## Vortex Virtual Machine Instructions
+
+> **Note:** This tutorial targets Vortex release [v2.3](https://github.com/vortexgpgpu/vortex/releases/tag/v2.3).
+
 For this tutorial, we provide access to a remote server with the tools as well as a virtual machine
 image that contains the prebuilt version of the tools as well as the Vortex git repo. This VM is
 built using Vagrant with a VirtualBox Provider, which means that it should be easy to run on most platforms.

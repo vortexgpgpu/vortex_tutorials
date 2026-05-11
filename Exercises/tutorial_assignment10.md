@@ -1,5 +1,7 @@
 # **Assignment #10: Add `fmaf()` Support in CuPBoP**
- 
+
+> Targets Vortex release [v2.3](https://github.com/vortexgpgpu/vortex/releases/tag/v2.3).
+
 This assignment introduces how to extend **CuPBoP**, a framework designed to execute **unmodified CUDA source code** on **Vortex**, to support new CUDA math functions.  
 
 In this task, you will **add `fmaf()` (fused multiply-add)** support to the framework — enabling CuPBoP to correctly translate and execute kernels using this CUDA intrinsic.
