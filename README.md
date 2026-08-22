@@ -1,6 +1,7 @@
 # Vortex Workshop and Tutorial at MICRO-59 (November 1, 2026)
 
 For more information about the workshop, please visit our [website](https://vortexgpgpu.github.io/micro2026.html).
+
 You can also find more information about Vortex on our [homepage](https://vortexgpgpu.github.io/).
 
 ## Tutorial Assignments
