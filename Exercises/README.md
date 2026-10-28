@@ -15,7 +15,7 @@ needs more time: each new hardware configuration is a Verilator build of 5–15 
 ## Setup (all assignments)
 
 ```bash
-git clone --branch v3.0 https://github.com/vortexgpgpu/vortex.git
+git clone --branch v3.0 --recursive https://github.com/vortexgpgpu/vortex.git
 cd vortex
 mkdir build32 && cd build32
 ../configure --xlen=32 --tooldir=$HOME/tools
