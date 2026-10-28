@@ -1,0 +1,81 @@
+# Vortex v3.0 tutorial image (MICRO 2026) -- x86_64
+#
+# SMALL image: only OS packages (Vortex's ci/install_dependencies.sh --vulkan, CUDA 12.1 headers for CuPBoP,
+# libtinfo/libunwind, editors, gtkwave, matplotlib). This definition file is all that is needed to build it
+# (no local files; it only needs network access).
+# The Vortex source tree and the toolchain are NOT inside; they are bind-mounted from the host
+# (git clone of Vortex, and the toolchain installed with Vortex's own ci/toolchain_install.sh --all; see BUILD_REPORT.md):
+#   /home/vortex (or /vortex)             <- Vortex source tree
+#   /home/tools  (or /opt/vortex-tools)   <- toolchain (TOOLCHAIN_REV=v3.0.1); TOOLDIR is set to whichever is mounted
+# Run with --fakeroot --cleanenv --writable-tmpfs plus the binds; the build output lives in the bound host directory,
+# so the 64 MB tmpfs is never filled and no overlay is needed.
+#
+#   apptainer build --fakeroot vortex_micro26.sif vortex_micro26.def
+#
+# Base ubuntu:22.04.
+
+Bootstrap: docker
+From: ubuntu:22.04
+
+%labels
+    Title vortex-micro26
+    Description Vortex v3.0 tutorial image (source and toolchain bind-mounted)
+    vortex.tag v3.0
+    vortex.commit 7fe19369587c087f902c3e2bc2add612aa910a95
+    vortex.toolchain_rev v3.0.1
+    vortex.xlen 32
+
+%environment
+    export LANG=C.UTF-8 LC_ALL=C.UTF-8
+    # The toolchain is bind-mounted; accept either location (/opt/vortex-tools or /home/tools).
+    # TOOLDIR must match the mount, because Vortex's config.mk uses `TOOLDIR ?=` and an exported value wins over `configure --tooldir`.
+    for d in /opt/vortex-tools /home/tools; do
+        if [ -d "$d/verilator" ]; then
+            export TOOLDIR=$d
+            export PATH=$d/verilator/bin:$d/llvm-vortex/bin:$d/pocl/bin:$PATH
+            export LD_LIBRARY_PATH=$d/llvm-vortex/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
+            break
+        fi
+    done
+    export CCACHE_DIR=/tmp/ccache
+    export VORTEX_BUILD=/vortex/build
+
+%post
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive
+    export LANG=C.UTF-8 LC_ALL=C.UTF-8
+    VORTEX_TAG=v3.0
+
+    apt-get update
+    apt-get install -y --no-install-recommends \
+        ca-certificates git wget curl bzip2 xz-utils \
+        vim nano less gtkwave python3-matplotlib time file procps
+
+    # Vortex's baseline apt packages; the script lives in the repo, so use a throw-away shallow clone.
+    git clone --depth 1 --branch ${VORTEX_TAG} https://github.com/vortexgpgpu/vortex.git /root/vx_deps
+    (cd /root/vx_deps && ./ci/install_dependencies.sh --vulkan)   # + Vulkan loader and glslc (Assignment 8)
+    rm -rf /root/vx_deps
+
+    # CUDA headers only (Assignment 9, CuPBoP): no GPU and no nvcc needed; /usr/local/cuda is the default CUDA_PATH.
+    wget -q https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb -O /tmp/cuda-keyring.deb
+    dpkg -i /tmp/cuda-keyring.deb && rm /tmp/cuda-keyring.deb
+    apt-get update
+    apt-get install -y --no-install-recommends cuda-cudart-dev-12-1 cuda-nvcc-12-1 cuda-driver-dev-12-1 libcurand-dev-12-1
+    # libtinfo-dev: CuPBoP's translators link -ltinfo; libunwind8: Mesa's lavapipe Vulkan driver (Assignment 8)
+    apt-get install -y --no-install-recommends libtinfo-dev libunwind8
+
+    apt-get purge -y valgrind libc6-dbg
+    apt-get clean
+    rm -rf /var/lib/apt/lists/*
+    git config --system --add safe.directory '*'
+
+    # Mount points for the bind-mounted source tree and toolchain.
+    mkdir -p /vortex /opt/vortex-tools /home/vortex /home/tools
+
+%runscript
+    cd /vortex/build
+    exec "$@"
+
+%test
+    set -e
+    for t in gcc g++ make python3 cmake git gtkwave; do command -v $t >/dev/null; done
