@@ -1,0 +1,304 @@
+diff --git a/VX_config.toml b/VX_config.toml
+--- a/VX_config.toml
++++ b/VX_config.toml
+@@ -291,6 +291,7 @@ VX_CFG_TCU_LATENCY = "expr: $tcu_latency_dsp if $VX_CFG_TCU_TYPE_DSP else ($tcu_
+ VX_CFG_TCU_TF32_ENABLE = false
+ VX_CFG_TCU_FP16_ENABLE = true
+ VX_CFG_TCU_FP8_ENABLE = false
++VX_CFG_TCU_FP6_ENABLE = false
+ VX_CFG_TCU_FP4_ENABLE = false
+ VX_CFG_TCU_INT8_ENABLE = false
+ VX_CFG_TCU_INT4_ENABLE = false
+diff --git a/hw/dpi/dpi_float.cpp b/hw/dpi/dpi_float.cpp
+--- a/hw/dpi/dpi_float.cpp
++++ b/hw/dpi/dpi_float.cpp
+@@ -351,6 +351,9 @@ void dpi_f2f(bool enable, int dst_fmt, int src_fmt, int64_t a, const svBitVecVal
+     case 7: // nvfp4
+       *result = nan_box(rv_e2m1tof_s(check_boxing4(a, 0xFF), *frm, fflags));
+       break;
++    case 8: // fp6 (e2m3, byte container)
++      *result = nan_box(rv_e2m3tof_s(check_boxing8(a, 0x3F), *frm, fflags));
++      break;
+     default:
+       std::abort();
+     }
+@@ -409,6 +412,15 @@ void dpi_f2f(bool enable, int dst_fmt, int src_fmt, int64_t a, const svBitVecVal
+       std::abort();
+     }
+     break;
++  case 8: // fp6
++    switch (src_fmt) {
++    case 0: // fp32
++      *result = nan_box8(rv_ftoe2m3_s(check_boxing(a), *frm, fflags));
++      break;
++    default:
++      std::abort();
++    }
++    break;
+   default:
+     std::abort();
+   }
+diff --git a/hw/rtl/tcu/VX_tcu_dsm.sv b/hw/rtl/tcu/VX_tcu_dsm.sv
+--- a/hw/rtl/tcu/VX_tcu_dsm.sv
++++ b/hw/rtl/tcu/VX_tcu_dsm.sv
+@@ -103,6 +103,13 @@ module VX_tcu_dsm import VX_tcu_pkg::*; #(
+             `endif
+             `endif
+             `endif
++            `ifdef VX_CFG_TCU_FP6_ENABLE
++                TCU_FP6_ID: begin
++                    for (int e = 0; e < 4; ++e) begin
++                        vld_mask_per_k[k][e * 2 +: 2] = {2{a_i8_nz[e] && b_i8_nz[e]}};
++                    end
++                end
++            `endif
+             `ifdef VX_CFG_TCU_INT8_ENABLE
+                 TCU_I8_ID,
+                 TCU_U8_ID: begin
+diff --git a/hw/rtl/tcu/VX_tcu_pkg.sv b/hw/rtl/tcu/VX_tcu_pkg.sv
+--- a/hw/rtl/tcu/VX_tcu_pkg.sv
++++ b/hw/rtl/tcu/VX_tcu_pkg.sv
+@@ -30,6 +30,7 @@ package VX_tcu_pkg;
+     localparam TCU_BF16_ID  = 3;
+     localparam TCU_FP8_ID   = 4;
+     localparam TCU_BF8_ID   = 5;
++    localparam TCU_FP6_ID   = 6;  // OCP MX e2m3 in a byte container
+     // MX formats have 2nd-MSB set
+     localparam TCU_MXFP8_ID = 8;
+     localparam TCU_MXBF8_ID = 9;
+@@ -244,6 +245,7 @@ package VX_tcu_pkg;
+             TCU_BF16_ID: return 8;
+             TCU_FP8_ID:  return 4;
+             TCU_BF8_ID:  return 5;
++            TCU_FP6_ID:  return 2;
+             TCU_TF32_ID: return 8;
+             default:     return 0;
+         endcase
+@@ -256,6 +258,7 @@ package VX_tcu_pkg;
+             TCU_BF16_ID: return 7;
+             TCU_FP8_ID:  return 3;
+             TCU_BF8_ID:  return 2;
++            TCU_FP6_ID:  return 3;
+             TCU_TF32_ID: return 10;
+             default:     return 0;
+         endcase
+@@ -268,6 +271,7 @@ package VX_tcu_pkg;
+             TCU_BF16_ID: return 15;
+             TCU_FP8_ID:  return 7;
+             TCU_BF8_ID:  return 7;
++            TCU_FP6_ID:  return 5;
+             TCU_TF32_ID: return 18;
+             default:     return 0;
+         endcase
+@@ -281,6 +285,7 @@ package VX_tcu_pkg;
+                 return 4;
+             TCU_FP8_ID,
+             TCU_BF8_ID,
++            TCU_FP6_ID,
+             TCU_I8_ID,
+             TCU_U8_ID,
+             TCU_MXFP8_ID,
+@@ -361,6 +366,7 @@ package VX_tcu_pkg;
+             TCU_BF16_ID:  `TRACE(level, ("bf16"))
+             TCU_FP8_ID:   `TRACE(level, ("fp8"))
+             TCU_BF8_ID:   `TRACE(level, ("bf8"))
++            TCU_FP6_ID:   `TRACE(level, ("fp6"))
+             TCU_TF32_ID:  `TRACE(level, ("tf32"))
+             TCU_MXFP8_ID: `TRACE(level, ("mxfp8"))
+             TCU_MXBF8_ID: `TRACE(level, ("mxbf8"))
+diff --git a/hw/rtl/tcu/dpi/VX_tcu_fedp_dpi.sv b/hw/rtl/tcu/dpi/VX_tcu_fedp_dpi.sv
+--- a/hw/rtl/tcu/dpi/VX_tcu_fedp_dpi.sv
++++ b/hw/rtl/tcu/dpi/VX_tcu_fedp_dpi.sv
+@@ -118,6 +118,17 @@ module VX_tcu_fedp_dpi import VX_tcu_pkg::*; #(
+                 end
+             end
+         `endif
++        `ifdef VX_CFG_TCU_FP6_ENABLE
++            TCU_FP6_ID: begin
++                prod = 64'hffffffff00000000;
++                for (int j = 0; j < 4; j++) begin
++                    dpi_f2f(enable, int'(0), int'(8), {56'hffffffffffffff, a_row[i][j * 8 +: 8]}, 3'b0, a_f, fflags);
++                    dpi_f2f(enable, int'(0), int'(8), {56'hffffffffffffff, b_col[i][j * 8 +: 8]}, 3'b0, b_f, fflags);
++                    dpi_fmul(enable, int'(0), a_f, b_f, 3'b0, temp, fflags);
++                    dpi_fadd(enable, int'(0), temp, prod, 3'b0, prod, fflags);
++                end
++            end
++        `endif
+         `ifdef VX_CFG_TCU_TF32_ENABLE
+             TCU_TF32_ID: begin
+                 prod = 64'hffffffff00000000;
+diff --git a/hw/rtl/tcu/tfr/VX_tcu_tfr_mul_join.sv b/hw/rtl/tcu/tfr/VX_tcu_tfr_mul_join.sv
+--- a/hw/rtl/tcu/tfr/VX_tcu_tfr_mul_join.sv
++++ b/hw/rtl/tcu/tfr/VX_tcu_tfr_mul_join.sv
+@@ -36,12 +36,18 @@ module VX_tcu_tfr_mul_join import VX_tcu_pkg::*; #(
+ `define TFR_JOIN_F16_ENABLE
+ `endif
+ 
++`ifdef VX_CFG_TCU_FP8_ENABLE
++`define TFR_JOIN_F8_ENABLE
++`elsif VX_CFG_TCU_FP6_ENABLE
++`define TFR_JOIN_F8_ENABLE
++`endif
++
+ `ifdef TFR_JOIN_F16_ENABLE
+     input wire [TCK-1:0][EXP_W-1:0] exp_f16,
+     input fedp_excep_t [TCK-1:0]    exc_f16,
+ `endif
+ 
+-`ifdef VX_CFG_TCU_FP8_ENABLE
++`ifdef TFR_JOIN_F8_ENABLE
+     input wire [TCK-1:0][EXP_W-1:0] exp_f8,
+     input fedp_excep_t [TCK-1:0]    exc_f8,
+ `endif
+@@ -154,3 +160,6 @@ endmodule
+ `ifdef TFR_JOIN_F16_ENABLE
+ `undef TFR_JOIN_F16_ENABLE
+ `endif
++`ifdef TFR_JOIN_F8_ENABLE
++`undef TFR_JOIN_F8_ENABLE
++`endif
+diff --git a/hw/rtl/tcu/tfr/VX_tcu_tfr_shared_mul.sv b/hw/rtl/tcu/tfr/VX_tcu_tfr_shared_mul.sv
+--- a/hw/rtl/tcu/tfr/VX_tcu_tfr_shared_mul.sv
++++ b/hw/rtl/tcu/tfr/VX_tcu_tfr_shared_mul.sv
+@@ -64,6 +64,12 @@ module VX_tcu_tfr_shared_mul import VX_tcu_pkg::*;  #(
+ `define TFR_MUL_F16_ENABLE
+ `endif
+ 
++`ifdef VX_CFG_TCU_FP8_ENABLE
++`define TFR_MUL_F8_ENABLE
++`elsif VX_CFG_TCU_FP6_ENABLE
++`define TFR_MUL_F8_ENABLE
++`endif
++
+ 
+ `ifdef TFR_MUL_F16_ENABLE
+     // F16 / BF16 / TF32
+@@ -94,8 +100,8 @@ module VX_tcu_tfr_shared_mul import VX_tcu_pkg::*;  #(
+     );
+ `endif
+ 
+-`ifdef VX_CFG_TCU_FP8_ENABLE
+-    // FP8 / BF8 / MXFP8 / MXBF8
++`ifdef TFR_MUL_F8_ENABLE
++    // FP8 / BF8 / MXFP8 / MXBF8 / FP6
+     wire [TCK-1:0][24:0]      mul_f8_sig;
+     wire [TCK-1:0][EXP_W-1:0] mul_f8_exp;
+     fedp_excep_t [TCK-1:0]    mul_f8_exc;
+@@ -261,7 +267,7 @@ module VX_tcu_tfr_shared_mul import VX_tcu_pkg::*;  #(
+         .exc_f16    (mul_f16_exc),
+     `endif
+ 
+-    `ifdef VX_CFG_TCU_FP8_ENABLE
++    `ifdef TFR_MUL_F8_ENABLE
+         .exp_f8     (mul_f8_exp),
+         .exc_f8     (mul_f8_exc),
+     `endif
+@@ -412,3 +418,6 @@ endmodule
+ `ifdef TFR_MUL_F16_ENABLE
+ `undef TFR_MUL_F16_ENABLE
+ `endif
++`ifdef TFR_MUL_F8_ENABLE
++`undef TFR_MUL_F8_ENABLE
++`endif
+diff --git a/hw/unittest/Makefile b/hw/unittest/Makefile
+--- a/hw/unittest/Makefile
++++ b/hw/unittest/Makefile
+@@ -102,6 +102,7 @@ define tcu_tfr_suite
+ 	$(call tcu_case,4,-DVX_CFG_TCU_TYPE_TFR -DUSE_FEDP,--fmt=3 --W=25)
+ 	$(call tcu_case,4,-DVX_CFG_TCU_TYPE_TFR -DUSE_FEDP -DVX_CFG_TCU_FP8_ENABLE,--fmt=4 --W=25)
+ 	$(call tcu_case,2,-DVX_CFG_TCU_TYPE_TFR -DUSE_FEDP -DVX_CFG_TCU_FP8_ENABLE,--fmt=5 --W=25)
++	$(call tcu_case,2,-DVX_CFG_TCU_TYPE_TFR -DUSE_FEDP -DVX_CFG_TCU_FP6_ENABLE,--fmt=6 --W=25)
+ 	$(call tcu_case,2,-DVX_CFG_TCU_TYPE_TFR -DUSE_FEDP -DVX_CFG_TCU_LATENCY=5,--fmt=2 --W=25)
+ 	$(call tcu_int_pair,TFR,INT8,17,18)
+ 	$(call tcu_int_pair,TFR,INT4,19,20)
+@@ -115,6 +116,7 @@ run-tcu:
+ 	$(call tcu_case,1,-DVX_CFG_TCU_TYPE_DPI,--fmt=3 --no-fused)
+ 	$(call tcu_case,1,-DVX_CFG_TCU_TYPE_DPI -DVX_CFG_TCU_FP8_ENABLE,--fmt=4 --no-fused)
+ 	$(call tcu_case,1,-DVX_CFG_TCU_TYPE_DPI -DVX_CFG_TCU_FP8_ENABLE,--fmt=5 --no-fused)
++	$(call tcu_case,1,-DVX_CFG_TCU_TYPE_DPI -DVX_CFG_TCU_FP6_ENABLE,--fmt=6 --no-fused)
+ 	# DPI reference — integer
+ 	$(call tcu_int_pair,DPI,INT8,17,18)
+ 	$(call tcu_int_pair,DPI,INT4,19,20)
+diff --git a/hw/unittest/tcu_fedp/fedp.h b/hw/unittest/tcu_fedp/fedp.h
+--- a/hw/unittest/tcu_fedp/fedp.h
++++ b/hw/unittest/tcu_fedp/fedp.h
+@@ -324,11 +324,14 @@ private:
+       bool p_is_zero = zA || zB;
+ 
+       bool is_e4m3 = (eb == 4 && sb == 3);
++      bool is_e2m3 = (eb == 2 && sb == 3); // OCP MX: no Inf/NaN encodings
+       bool infA, infB, nanA, nanB;
+       if (is_e4m3) {
+         infA = false; infB = false;
+         nanA = (a.exp == 15 && a.frac == 7);
+         nanB = (b.exp == 15 && b.frac == 7);
++      } else if (is_e2m3) {
++        infA = false; infB = false; nanA = false; nanB = false;
+       } else {
+         infA = (a.exp == all1 && !a.frac); infB = (b.exp == all1 && !b.frac);
+         nanA = (a.exp == all1 && a.frac); nanB = (b.exp == all1 && b.frac);
+diff --git a/hw/unittest/tcu_fedp/fedp.py b/hw/unittest/tcu_fedp/fedp.py
+--- a/hw/unittest/tcu_fedp/fedp.py
++++ b/hw/unittest/tcu_fedp/fedp.py
+@@ -34,6 +34,7 @@ FORMAT_SPECS = {
+   "bf16": {"eb": 8, "sb": 7,  "desc": "BF16 (e8m7)"},
+   "bf8":  {"eb": 5, "sb": 2,  "desc": "BF8 (e5m2)"},
+   "fp8":  {"eb": 4, "sb": 3,  "desc": "FP8 (e4m3)"},
++  "fp6":  {"eb": 2, "sb": 3,  "desc": "FP6 (e2m3, no Inf/NaN)"},
+ }
+ 
+ _FMT_ALIASES = {
+diff --git a/hw/unittest/tcu_fedp/main.cpp b/hw/unittest/tcu_fedp/main.cpp
+--- a/hw/unittest/tcu_fedp/main.cpp
++++ b/hw/unittest/tcu_fedp/main.cpp
+@@ -158,11 +158,20 @@ void init_default_fp_format(uint32_t fmt, int *exp_bits, int *sig_bits) {
+       *exp_bits = 5;
+       *sig_bits = 2;
+       break;
++    case 6: // fp6 (E2M3)
++      *exp_bits = 2;
++      *sig_bits = 3;
++      break;
+     default:
+       break;
+   }
+ }
+ 
++// OCP MX e2m3 reserves no encodings for Inf/NaN: every exponent is finite.
++static bool fmt_has_specials(int exp_bits, int sig_bits) {
++  return !(exp_bits == 2 && sig_bits == 3);
++}
++
+ struct TestConfig {
+   uint64_t max_cycles = 1000;
+   bool enable_tracing = true;
+@@ -318,7 +327,7 @@ static float dot_product(const uint32_t* A, const uint32_t* B, uint32_t C, int n
+       // FP8 E4M3 exception
+       if (exp == 15 && frac == 7) return std::numeric_limits<long double>::quiet_NaN();
+     } else
+-    if (exp == all1) {
++    if (exp == all1 && fmt_has_specials(ebits, sbits)) {
+       if (frac) return std::numeric_limits<long double>::quiet_NaN();
+       return sign ? -std::numeric_limits<long double>::infinity()
+                   :  std::numeric_limits<long double>::infinity();
+@@ -492,7 +501,8 @@ private:
+ 
+     std::uniform_int_distribution<uint32_t> bit_dist(0, 0xFFFFFFFFu);
+     std::uniform_int_distribution<uint32_t> sign_dist(0, 1);
+-    std::uniform_int_distribution<uint32_t> exp_norm_dist(1, (all_exp > 0 ? all_exp - 1 : 0)); // [1, all_ones-1]
++    const uint32_t max_norm_exp = fmt_has_specials(exp_bits, sig_bits) ? (all_exp > 0 ? all_exp - 1 : 0) : all_exp;
++    std::uniform_int_distribution<uint32_t> exp_norm_dist(1, max_norm_exp); // [1, all_ones-1], or all_ones without specials
+     std::uniform_int_distribution<uint32_t> frac_dist(0, (max_frac > 0 ? max_frac : 0));
+     std::uniform_int_distribution<uint32_t> frac_nz_dist(1, (max_frac > 0 ? max_frac : 1)); // nonzero frac
+ 
+@@ -524,8 +534,8 @@ private:
+         e = 1u;
+         f = frac_dist(rng_);
+         break;
+-      case 2: // largest finite: exp=all_ones-1, frac=all_ones
+-        e = (all_exp > 0 ? all_exp - 1 : 0);
++      case 2: // largest finite: exp=all_ones-1 (all_ones without specials), frac=all_ones
++        e = max_norm_exp;
+         f = max_frac;
+         break;
+       case 3: // near one: exponent=bias, small fraction

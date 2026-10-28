@@ -1,0 +1,61 @@
+diff --git a/examples/test_normcdff/test_normcdff.cu b/examples/test_normcdff/test_normcdff.cu
+new file mode 100644
+index 0000000..22c6789
+--- /dev/null
++++ b/examples/test_normcdff/test_normcdff.cu
+@@ -0,0 +1,47 @@
++// normcdff() on CuPBoP/Vortex: out[i] = normcdff(x[i]) (standard normal CDF), checked against
++// 0.5 * erfc(-x / sqrt(2)) computed in double on the host.
++#include <cuda_runtime.h>
++#include <math.h>
++#include <stdio.h>
++#include <stdlib.h>
++
++__global__ void normcdf_kernel(const float *x, float *out, int n) {
++  int i = blockIdx.x * blockDim.x + threadIdx.x;
++  if (i < n)
++    out[i] = normcdff(x[i]);
++}
++
++int main() {
++  const int n = 1024, block = 256;
++  size_t bytes = n * sizeof(float);
++  float *x = (float *)malloc(bytes), *out = (float *)malloc(bytes);
++  for (int i = 0; i < n; ++i)
++    x[i] = -8.0f + 16.0f * i / (n - 1);  // covers both tails
++
++  float *d_x, *d_out;
++  cudaMalloc((void **)&d_x, bytes);
++  cudaMalloc((void **)&d_out, bytes);
++  cudaMemcpy(d_x, x, bytes, cudaMemcpyHostToDevice);
++  normcdf_kernel<<<(n + block - 1) / block, block>>>(d_x, d_out, n);
++  cudaDeviceSynchronize();
++  cudaMemcpy(out, d_out, bytes, cudaMemcpyDeviceToHost);
++
++  int errors = 0;
++  for (int i = 0; i < n; ++i) {
++    double ref = 0.5 * erfc(-(double)x[i] / sqrt(2.0));
++    double err = fabs(out[i] - ref);
++    if (!(err <= 1e-6 + 1e-5 * fabs(ref))) {
++      if (errors < 10)
++        printf("mismatch at %d: normcdff(%g) = %.9g, expected %.9g\n", i, x[i], out[i], ref);
++      ++errors;
++    }
++  }
++  for (int i = 0; i < n; i += 255)
++    printf("normcdff(%+.4f) = %.7f\n", x[i], out[i]);
++  if (errors) {
++    printf("FAILED! %d of %d mismatches\n", errors, n);
++    return 1;
++  }
++  printf("PASSED!\n");
++  return 0;
++}
+diff --git a/examples/test_normcdff/Makefile b/examples/test_normcdff/Makefile
+new file mode 100644
+index 0000000..39c1f3a
+--- /dev/null
++++ b/examples/test_normcdff/Makefile
+@@ -0,0 +1,2 @@
++KERNEL_CU = test_normcdff.cu
++include ../common.mk

@@ -1,0 +1,21 @@
+model,app,args,policy,instrs,cycles,ipc
+simx,sgemm,-n32,GTO,24224,40983,0.591
+simx,sgemm,-n32,RR,24224,45265,0.535
+simx,vecadd,-n16384,GTO,49184,77236,0.637
+simx,vecadd,-n16384,RR,49184,78116,0.630
+simx,bfs,-n1024,GTO,3492,20882,0.167
+simx,bfs,-n1024,RR,3492,21114,0.165
+simx,stencil3d,-n16,GTO,111648,203767,0.548
+simx,stencil3d,-n16,RR,111648,196913,0.567
+simx,softmax,-n64,GTO,908826,1862900,0.488
+simx,softmax,-n64,RR,908826,1660274,0.547
+simx,raycast,-w32 -h32,GTO,991337,2768599,0.358
+simx,raycast,-w32 -h32,RR,991337,2773246,0.357
+rtlsim,sgemm,-n32,GTO,24224,44425,0.545
+rtlsim,sgemm,-n32,RR,24224,40667,0.596
+rtlsim,softmax,-n64,GTO,908826,1682806,0.540
+rtlsim,softmax,-n64,RR,908826,1662339,0.547
+rtlsim,sgemm,-n32,v3.0 stock (greedy RR),24224,42641,0.568
+rtlsim,softmax,-n64,v3.0 stock (greedy RR),908826,1677197,0.542
+simx,sgemm,-n32,GTO with least-recently-granted fallback,24224,45154,0.536
+simx,softmax,-n64,GTO with least-recently-granted fallback,908826,1679170,0.541

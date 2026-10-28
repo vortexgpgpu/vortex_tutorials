@@ -1,0 +1,7 @@
+app,args,driver,rtl,result,instrs,cycles,errors,csv_diff_lines_vs_simx
+arith,,simx,-,PASSED,1437,6134,0,-
+arith,,rtlsim,buggy,FAILED,1437,6059,41,160
+arith,,rtlsim,fixed,PASSED,1437,6059,0,0
+demo,-n100,simx,-,PASSED,3740,9764,0,-
+demo,-n100,rtlsim,buggy,PASSED,3740,9624,0,-
+demo,-n100,rtlsim,fixed,PASSED,3740,9624,0,-

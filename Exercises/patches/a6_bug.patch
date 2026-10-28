@@ -1,0 +1,13 @@
+diff --git a/hw/rtl/core/VX_alu_int.sv b/hw/rtl/core/VX_alu_int.sv
+index 3a68005..ac39335 100644
+--- a/hw/rtl/core/VX_alu_int.sv
++++ b/hw/rtl/core/VX_alu_int.sv
+@@ -103,7 +103,7 @@ module VX_alu_int import VX_gpu_pkg::*; #(
+     end
+ 
+     for (genvar i = 0; i < NUM_LANES; ++i) begin : g_shr_result
+-        wire [`VX_CFG_XLEN:0] shr_in1 = {is_signed && alu_in1[i][`VX_CFG_XLEN-1], alu_in1[i]};
++        wire [`VX_CFG_XLEN:0] shr_in1 = {is_signed && alu_in1[i][`VX_CFG_XLEN-2], alu_in1[i]};
+         always @(*) begin
+             case (alu_op[1:0])
+             `ifdef VX_CFG_EXT_ZICOND_ENABLE

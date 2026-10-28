@@ -1,0 +1,105 @@
+diff --git a/examples/softmax/softmax.cu b/examples/softmax/softmax.cu
+new file mode 100644
+index 0000000..e08262b
+--- /dev/null
++++ b/examples/softmax/softmax.cu
+@@ -0,0 +1,89 @@
++// Row softmax, same semantics as vortex tests/regression/softmax:
++// one CUDA thread per row, out[r][c] = exp(x[r][c] - max_r) / sum_r, polynomial exp from its common.h,
++// max initialized to 0 (inputs in [0,1)), exp values written back into the input buffer.
++#include <cuda_runtime.h>
++#include <stdint.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <unistd.h>
++
++#define FLOAT_ULP 10
++
++__host__ __device__ inline float poly_exp(float x) {
++  float y = 1 + x * 0.25;
++  y = 1 + x * y * 0.333;
++  y = 1 + x * y * 0.5;
++  y = 1 + x * y;
++  return y;
++}
++
++__global__ void softmax_kernel(float *src, float *dst, uint32_t num_rows, uint32_t num_cols) {
++  uint32_t row = blockIdx.x * blockDim.x + threadIdx.x;
++  if (row >= num_rows)
++    return;
++  uint32_t offset = row * num_cols;
++  float max = 0.0f;
++  for (uint32_t i = 0; i < num_cols; i++) {
++    float curr = src[offset + i];
++    if (curr > max) max = curr;
++  }
++  float sum = 0.0f;
++  for (uint32_t i = 0; i < num_cols; i++) {
++    float computed = poly_exp(src[offset + i] - max);
++    src[offset + i] = computed;
++    sum += computed;
++  }
++  for (uint32_t i = 0; i < num_cols; i++)
++    dst[offset + i] = src[offset + i] / sum;
++}
++
++int main(int argc, char **argv) {
++  uint32_t size = 64, block = 64;
++  int c;
++  while ((c = getopt(argc, argv, "n:b:")) != -1) {
++    if (c == 'n') size = atoi(optarg);
++    if (c == 'b') block = atoi(optarg);
++  }
++  uint32_t num_rows = size, num_cols = size, total = size * size;
++  size_t bytes = total * sizeof(float);
++  float *h_src = (float *)malloc(bytes), *h_dst = (float *)malloc(bytes);
++  srand(50);
++  for (uint32_t i = 0; i < total; ++i) {
++    h_src[i] = (float)rand() / RAND_MAX;
++    (void)rand();  // native test also draws src1
++  }
++  float *d_src, *d_dst;
++  cudaMalloc((void **)&d_src, bytes);
++  cudaMalloc((void **)&d_dst, bytes);
++  cudaMemcpy(d_src, h_src, bytes, cudaMemcpyHostToDevice);
++  uint32_t grid = (num_rows + block - 1) / block;
++  printf("softmax %ux%u, grid=%u block=%u\n", num_rows, num_cols, grid, block);
++  softmax_kernel<<<grid, block>>>(d_src, d_dst, num_rows, num_cols);
++  cudaDeviceSynchronize();
++  cudaMemcpy(h_dst, d_dst, bytes, cudaMemcpyDeviceToHost);
++
++  int errors = 0;
++  for (uint32_t r = 0; r < num_rows; ++r) {
++    const float *x = h_src + r * num_cols;
++    float max = 0.0f, sum = 0.0f;
++    for (uint32_t k = 0; k < num_cols; k++) if (x[k] > max) max = x[k];
++    for (uint32_t k = 0; k < num_cols; k++) sum += poly_exp(x[k] - max);
++    for (uint32_t k = 0; k < num_cols; k++) {
++      float ref = poly_exp(x[k] - max) / sum, cur = h_dst[r * num_cols + k];
++      int32_t ia, ib;
++      memcpy(&ia, &cur, 4);
++      memcpy(&ib, &ref, 4);
++      if (abs(ia - ib) > FLOAT_ULP) {
++        if (errors < 10) printf("*** error: [%u][%u] expected=%f, actual=%f\n", r, k, ref, cur);
++        ++errors;
++      }
++    }
++  }
++  if (errors) {
++    printf("Found %d errors!\nFAILED!\n", errors);
++    return 1;
++  }
++  printf("PASSED!\n");
++  return 0;
++}
+diff --git a/examples/softmax/Makefile b/examples/softmax/Makefile
+new file mode 100644
+index 0000000..92a6f49
+--- /dev/null
++++ b/examples/softmax/Makefile
+@@ -0,0 +1,4 @@
++KERNEL_CU = softmax.cu
++RUN_ARGS = -n 64 -b 64
++CI_RUN_ARGS = -n 64 -b 64
++include ../common.mk

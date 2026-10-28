@@ -1,0 +1,17 @@
+config,size,tile,variant,app,args,chunk_k,instrs,cycles,ipc
+4w x 4t,32,4,LD/ST as shipped,sgemm2,-n32 -t4,4,162576,461550,0.352
+4w x 4t,32,4,LD/ST full K,sgemm2,-n32 -t4 -c32,32,115984,308079,0.376
+4w x 4t,32,4,DXA single-buffered,sgemm2_dxa,-n32 -t4 -m1,32,92432,275272,0.336
+4w x 4t,32,4,DXA -m2 (auto chunk = full K),sgemm2_dxa,-n32 -t4 -m2,32,101648,281692,0.361
+4w x 4t,32,4,LD/ST chunk 8,sgemm2,-n32 -t4 -c8,8,135952,374075,0.363
+4w x 4t,32,4,DXA double-buffered chunk 8,sgemm2_dxa,-n32 -t4 -m2 -c8,8,127568,380903,0.335
+4w x 4t,64,4,LD/ST as shipped,sgemm2,-n64 -t4,4,1223696,3525390,0.347
+4w x 4t,64,4,LD/ST full K,sgemm2,-n64 -t4 -c64,64,824336,2215348,0.372
+4w x 4t,64,4,DXA single-buffered,sgemm2_dxa,-n64 -t4 -m1,64,664592,1944279,0.342
+4w x 4t,64,4,DXA -m2 (auto chunk = full K),sgemm2_dxa,-n64 -t4 -m2,64,701456,1962417,0.357
+4w x 4t,64,4,LD/ST chunk 16,sgemm2,-n64 -t4 -c16,16,904208,2470316,0.366
+4w x 4t,64,4,DXA double-buffered chunk 16,sgemm2_dxa,-n64 -t4 -m2 -c16,16,805136,2317023,0.347
+16w x 4t,64,8,LD/ST as shipped,sgemm2,-n64 -t8,8,879680,1760429,0.500
+16w x 4t,64,8,LD/ST full K,sgemm2,-n64 -t8 -c64,64,693312,1369929,0.506
+16w x 4t,64,8,DXA single-buffered,sgemm2_dxa,-n64 -t8 -m1,64,662336,1286912,0.515
+16w x 4t,64,8,DXA -m2 (auto chunk = full K),sgemm2_dxa,-n64 -t8 -m2,64,699200,1324628,0.528

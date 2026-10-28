@@ -1,0 +1,80 @@
+diff --git a/hw/rtl/tcu/tfr/VX_tcu_tfr_mul_f8.sv b/hw/rtl/tcu/tfr/VX_tcu_tfr_mul_f8.sv
+--- a/hw/rtl/tcu/tfr/VX_tcu_tfr_mul_f8.sv
++++ b/hw/rtl/tcu/tfr/VX_tcu_tfr_mul_f8.sv
+@@ -61,12 +61,14 @@ module VX_tcu_tfr_mul_f8 import VX_tcu_pkg::*;
+     localparam E_FP8 = VX_tcu_pkg::exp_bits(TCU_FP8_ID);
+     localparam S_FP8 = VX_tcu_pkg::sign_pos(TCU_FP8_ID);
+     localparam B_FP8 = (1 << (E_FP8 - 1)) - 1;
+-    localparam [7:0] BIAS_CONST_FP8  = 8'(BIAS_BASE - 2*B_FP8);
++    // EXP_W wide: BIAS_BASE is above 255, so only formats with a large bias
++    // (2*bias > BIAS_BASE - 256) fit an 8-bit constant.
++    localparam [EXP_W-1:0] BIAS_CONST_FP8 = EXP_W'(BIAS_BASE - 2*B_FP8);
+ 
+     localparam E_BF8 = VX_tcu_pkg::exp_bits(TCU_BF8_ID);
+     localparam S_BF8 = VX_tcu_pkg::sign_pos(TCU_BF8_ID);
+     localparam B_BF8 = (1 << (E_BF8 - 1)) - 1;
+-    localparam [7:0] BIAS_CONST_BF8  = 8'(BIAS_BASE - 2*B_BF8);
++    localparam [EXP_W-1:0] BIAS_CONST_BF8 = EXP_W'(BIAS_BASE - 2*B_BF8);
+ 
+     for (genvar i = 0; i < TCK; ++i) begin : g_lane
+ 
+@@ -192,7 +194,7 @@ module VX_tcu_tfr_mul_f8 import VX_tcu_pkg::*;
+         wire [5:0] diff_abs = term0_is_max ? diff_0_minus_1[5:0] : diff_1_minus_0[5:0];
+         wire [5:0] max_pre_sum = term0_is_max ? pre_sum_0 : pre_sum_1;
+ 
+-        wire [7:0] bias_sel = is_bfloat ? BIAS_CONST_BF8 : BIAS_CONST_FP8;
++        wire [EXP_W-1:0] bias_sel = is_bfloat ? BIAS_CONST_BF8 : BIAS_CONST_FP8;
+ 
+         wire [EXP_W-1:0] max_pre_sum_cpa, bias_sel_cpa;
+         wire [EXP_W-1:0] final_exp;
+diff --git a/hw/unittest/tcu_fedp/fedp.h b/hw/unittest/tcu_fedp/fedp.h
+--- a/hw/unittest/tcu_fedp/fedp.h
++++ b/hw/unittest/tcu_fedp/fedp.h
+@@ -274,8 +274,10 @@ private:
+ 
+   std::vector<std::array<dec_t, 2>> decode_inputs(const uint32_t *a, const uint32_t *b, uint32_t n) {
+     const uint32_t width = 1u + exp_bits_ + sig_bits_;
+-    const bool packed = (width <= 16u) && ((32u % width) == 0u);
+-    const uint32_t epw = packed ? (32u / width) : 1u;
++    // Elements live in byte-multiple containers (a 6-bit format occupies the low 6 bits of a byte).
++    const uint32_t cwidth = (width <= 8u) ? 8u : (width <= 16u) ? 16u : 32u;
++    const bool packed = (cwidth <= 16u);
++    const uint32_t epw = packed ? (32u / cwidth) : 1u;
+     std::vector<std::array<dec_t, 2>> out(n * epw);
+     for (uint32_t w = 0; w < n; ++w) {
+       uint32_t aw = a[w], bw = b[w];
+@@ -283,7 +285,7 @@ private:
+         uint32_t aenc = packed ? (aw & ((1u << width) - 1u)) : aw;
+         uint32_t benc = packed ? (bw & ((1u << width) - 1u)) : bw;
+         out[w * epw + i] = {decode_input(aenc, exp_bits_, sig_bits_), decode_input(benc, exp_bits_, sig_bits_)};
+-        if (packed) { aw >>= width; bw >>= width; }
++        if (packed) { aw >>= cwidth; bw >>= cwidth; }
+       }
+     }
+     return out;
+diff --git a/hw/unittest/tcu_fedp/fedp.py b/hw/unittest/tcu_fedp/fedp.py
+--- a/hw/unittest/tcu_fedp/fedp.py
++++ b/hw/unittest/tcu_fedp/fedp.py
+@@ -1001,9 +1001,11 @@ def _ensure_cpp_ext(source_path):
+   return _cpp_ext
+ 
+ def _pack_lanes_u32(lanes_u32, elt_bits: int):
+-  if not (elt_bits <= 16) and (32 % elt_bits == 0):
++  # Elements live in byte-multiple containers (a 6-bit format occupies the low 6 bits of a byte).
++  cwidth = 8 if elt_bits <= 8 else (16 if elt_bits <= 16 else 32)
++  if cwidth > 16:
+     return list(lanes_u32)
+-  epw = 32 // elt_bits
++  epw = 32 // cwidth
+   mask = (1 << elt_bits) - 1
+   packed_u32 = []
+   for i in range(0, len(lanes_u32), epw):
+@@ -1011,7 +1013,7 @@ def _pack_lanes_u32(lanes_u32, elt_bits: int):
+     for j in range(epw):
+       idx = i + j
+       lane = lanes_u32[idx] if idx < len(lanes_u32) else 0
+-      w |= (lane & mask) << (j * elt_bits)
++      w |= (lane & mask) << (j * cwidth)
+     packed_u32.append(w & 0xFFFFFFFF)
+   return packed_u32
+ 

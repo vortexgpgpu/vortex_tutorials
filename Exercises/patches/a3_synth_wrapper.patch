@@ -1,0 +1,85 @@
+diff --git a/hw/syn/yosys/dut/catalog.mk b/hw/syn/yosys/dut/catalog.mk
+--- a/hw/syn/yosys/dut/catalog.mk
++++ b/hw/syn/yosys/dut/catalog.mk
+@@ -9,7 +9,7 @@
+ # synthesizes, so both gates measure the same modules and a divergence between
+ # them is meaningful rather than an artefact of two DUT lists.
+ 
+-DUTS := cache core tcu gfx tex raster om rtu dxa vm tensor top vortex
++DUTS := cache core tcu gfx tex raster om rtu dxa vm tensor top vortex dot8
+ 
+ UNITTEST_DIR ?= $(VORTEX_HOME)/hw/unittest
+ AFU_RTL_DIR  ?= $(VORTEX_HOME)/hw/rtl/afu
+@@ -18,6 +18,10 @@ cache_TOP := VX_cache_top
+ cache_INC := -I$(UNITTEST_DIR)/cache
+ cache_CFG := -DVX_CFG_EXT_A_ENABLE
+ 
++dot8_TOP := VX_alu_dot8_top
++dot8_INC := -I$(UNITTEST_DIR)/alu_dot8
++dot8_CFG := -DVX_CFG_NUM_THREADS=4 -DVX_CFG_NUM_WARPS=4
++
+ core_TOP := VX_core_top
+ core_INC := -I$(UNITTEST_DIR)/core
+ core_CFG := -DVX_CFG_NUM_THREADS=16 -DVX_CFG_NUM_WARPS=16 -DVX_CFG_EXT_C_ENABLE -DVX_CFG_EXT_A_ENABLE
+diff --git a/hw/unittest/alu_dot8/VX_alu_dot8_top.sv b/hw/unittest/alu_dot8/VX_alu_dot8_top.sv
+new file mode 100644
+--- /dev/null
++++ b/hw/unittest/alu_dot8/VX_alu_dot8_top.sv
+@@ -0,0 +1,57 @@
++// Copyright © 2019-2023
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++// http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++`include "VX_define.vh"
++
++// Synthesis wrapper: exposes VX_alu_dot8's interfaces as plain ports.
++module VX_alu_dot8_top import VX_gpu_pkg::*; #(
++    parameter NUM_LANES = `VX_CFG_NUM_ALU_LANES
++) (
++    input  wire                             clk,
++    input  wire                             reset,
++
++    input  wire                             execute_valid,
++    input  wire [$bits(alu_execute_t)-1:0]  execute_data,
++    output wire                             execute_ready,
++
++    output wire                             result_valid,
++    output wire [$bits(alu_result_t)-1:0]   result_data,
++    input  wire                             result_ready
++);
++    VX_execute_if #(
++        .data_t (alu_execute_t)
++    ) execute_if();
++
++    VX_result_if #(
++        .data_t (alu_result_t)
++    ) result_if();
++
++    assign execute_if.valid = execute_valid;
++    assign execute_if.data  = execute_data;
++    assign execute_ready    = execute_if.ready;
++
++    assign result_valid     = result_if.valid;
++    assign result_data      = result_if.data;
++    assign result_if.ready  = result_ready;
++
++    VX_alu_dot8 #(
++        .INSTANCE_ID ("dot8"),
++        .NUM_LANES   (NUM_LANES)
++    ) alu_dot8 (
++        .clk        (clk),
++        .reset      (reset),
++        .execute_if (execute_if),
++        .result_if  (result_if)
++    );
++
++endmodule

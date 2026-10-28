@@ -1,0 +1,10 @@
+variant,exp,n64_instrs,n64_cycles,n128_instrs,n128_cycles
+native as shipped,"4-term poly, double literals (soft-double)",1789797,4861402,7105135,19274899
+"native, f literals","4-term poly, float",34878,115790,137464,454657
+"native, all Step 0 fixes","4-term poly, float",34734,115400,137176,451919
+"native, Cephes exp",Cephes expf,70206,231561,277749,915843
+OpenCL,PoCL exp -> vx_expf,92488,313234,364932,1226426
+"OpenCL, Cephes exp",Cephes expf,70809,236527,278567,926439
+HIP,Cephes softmax_expf (scaffold),71696,243815,279902,935840
+Vulkan,GLSL exp -> libm exp2f (soft-double),2957827,8062735,11766930,32003976
+"Vulkan, Cephes exp",Cephes expf,96009,311869,379971,1233984

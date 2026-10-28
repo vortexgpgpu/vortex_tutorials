@@ -1,0 +1,219 @@
+diff --git a/hw/rtl/VX_gpu_pkg.sv b/hw/rtl/VX_gpu_pkg.sv
+--- a/hw/rtl/VX_gpu_pkg.sv
++++ b/hw/rtl/VX_gpu_pkg.sv
+@@ -1207,6 +1207,9 @@ package VX_gpu_pkg;
+         logic [PERF_CTR_BITS-1:0] mshr_stalls;
+         logic [PERF_CTR_BITS-1:0] mem_stalls;
+         logic [PERF_CTR_BITS-1:0] crsp_stalls;
++        logic [PERF_CTR_BITS-1:0] prefetch_reqs;    // prefetch misses that issued a fill
++        logic [PERF_CTR_BITS-1:0] prefetch_unused;  // prefetched lines evicted before a demand hit
++        logic [PERF_CTR_BITS-1:0] prefetch_late;    // demand misses that joined an in-flight prefetch
+     } cache_perf_t;
+ 
+     typedef struct packed {
+diff --git a/hw/rtl/cache/VX_cache.sv b/hw/rtl/cache/VX_cache.sv
+--- a/hw/rtl/cache/VX_cache.sv
++++ b/hw/rtl/cache/VX_cache.sv
+@@ -89,6 +89,9 @@ module VX_cache import VX_gpu_pkg::*; #(
+     wire [NUM_BANKS-1:0] perf_write_miss_per_bank;
+     wire [NUM_BANKS-1:0] perf_evictions_per_bank;
+     wire [NUM_BANKS-1:0] perf_mshr_stall_per_bank;
++    wire [NUM_BANKS-1:0] perf_pf_req_per_bank;
++    wire [NUM_BANKS-1:0] perf_pf_unused_per_bank;
++    wire [NUM_BANKS-1:0] perf_pf_late_per_bank;
+ `endif
+     VX_mem_bus_if #(
+         .DATA_SIZE (WORD_SIZE),
+@@ -339,6 +342,9 @@ module VX_cache import VX_gpu_pkg::*; #(
+             .perf_write_miss    (perf_write_miss_per_bank[bank_id]),
+             .perf_evictions     (perf_evictions_per_bank[bank_id]),
+             .perf_mshr_stall    (perf_mshr_stall_per_bank[bank_id]),
++            .perf_pf_req        (perf_pf_req_per_bank[bank_id]),
++            .perf_pf_unused     (perf_pf_unused_per_bank[bank_id]),
++            .perf_pf_late       (perf_pf_late_per_bank[bank_id]),
+         `endif
+             .core_req_valid     (per_bank_core_req_valid[bank_id]),
+             .core_req_addr      (per_bank_core_req_addr[bank_id]),
+@@ -522,6 +528,12 @@ module VX_cache import VX_gpu_pkg::*; #(
+     wire [`CLOG2(NUM_BANKS+1)-1:0] perf_evictions_per_cycle;
+     wire [`CLOG2(NUM_BANKS+1)-1:0] perf_mshr_stall_per_cycle;
+     wire [`CLOG2(MEM_PORTS+1)-1:0] perf_mem_stall_per_cycle;
++    wire [`CLOG2(NUM_BANKS+1)-1:0] perf_pf_req_per_cycle;
++    wire [`CLOG2(NUM_BANKS+1)-1:0] perf_pf_unused_per_cycle;
++    wire [`CLOG2(NUM_BANKS+1)-1:0] perf_pf_late_per_cycle;
++    `POP_COUNT(perf_pf_req_per_cycle, perf_pf_req_per_bank);
++    `POP_COUNT(perf_pf_unused_per_cycle, perf_pf_unused_per_bank);
++    `POP_COUNT(perf_pf_late_per_cycle, perf_pf_late_per_bank);
+     `POP_COUNT(perf_core_reads_per_cycle, perf_core_reads_per_req);
+     `POP_COUNT(perf_core_writes_per_cycle, perf_core_writes_per_req);
+     `POP_COUNT(perf_read_miss_per_cycle, perf_read_miss_per_bank);
+@@ -538,8 +550,14 @@ module VX_cache import VX_gpu_pkg::*; #(
+     reg [PERF_CTR_BITS-1:0] perf_mshr_stalls;
+     reg [PERF_CTR_BITS-1:0] perf_mem_stalls;
+     reg [PERF_CTR_BITS-1:0] perf_crsp_stalls;
++    reg [PERF_CTR_BITS-1:0] perf_pf_reqs;
++    reg [PERF_CTR_BITS-1:0] perf_pf_unused;
++    reg [PERF_CTR_BITS-1:0] perf_pf_late;
+     always @(posedge clk) begin
+         if (reset) begin
++            perf_pf_reqs      <= '0;
++            perf_pf_unused    <= '0;
++            perf_pf_late      <= '0;
+             perf_core_reads   <= '0;
+             perf_core_writes  <= '0;
+             perf_read_misses  <= '0;
+@@ -557,6 +575,9 @@ module VX_cache import VX_gpu_pkg::*; #(
+             perf_mshr_stalls  <= perf_mshr_stalls  + PERF_CTR_BITS'(perf_mshr_stall_per_cycle);
+             perf_mem_stalls   <= perf_mem_stalls   + PERF_CTR_BITS'(perf_mem_stall_per_cycle);
+             perf_crsp_stalls  <= perf_crsp_stalls  + PERF_CTR_BITS'(perf_crsp_stall_per_cycle);
++            perf_pf_reqs      <= perf_pf_reqs      + PERF_CTR_BITS'(perf_pf_req_per_cycle);
++            perf_pf_unused    <= perf_pf_unused    + PERF_CTR_BITS'(perf_pf_unused_per_cycle);
++            perf_pf_late      <= perf_pf_late      + PERF_CTR_BITS'(perf_pf_late_per_cycle);
+         end
+     end
+     assign cache_perf.reads        = perf_core_reads;
+@@ -568,5 +589,8 @@ module VX_cache import VX_gpu_pkg::*; #(
+     assign cache_perf.mshr_stalls  = perf_mshr_stalls;
+     assign cache_perf.mem_stalls   = perf_mem_stalls;
+     assign cache_perf.crsp_stalls  = perf_crsp_stalls;
++    assign cache_perf.prefetch_reqs   = perf_pf_reqs;
++    assign cache_perf.prefetch_unused = perf_pf_unused;
++    assign cache_perf.prefetch_late   = perf_pf_late;
+ `endif
+ endmodule
+diff --git a/hw/rtl/cache/VX_cache_bank.sv b/hw/rtl/cache/VX_cache_bank.sv
+--- a/hw/rtl/cache/VX_cache_bank.sv
++++ b/hw/rtl/cache/VX_cache_bank.sv
+@@ -50,6 +50,9 @@ module VX_cache_bank import VX_gpu_pkg::*; #(
+     output wire perf_write_miss,
+     output wire perf_evictions,
+     output wire perf_mshr_stall,
++    output wire perf_pf_req,
++    output wire perf_pf_unused,
++    output wire perf_pf_late,
+ `endif
+ 
+     // Core request
+@@ -1300,6 +1303,81 @@ module VX_cache_bank import VX_gpu_pkg::*; #(
+     assign perf_write_miss = do_write_st1 && ~st1.lk.is_hit;
+     assign perf_evictions  = do_writeback_stc;
+     assign perf_mshr_stall = mshr_alm_full;
++
++    // ========================================================================
++    // Software-prefetch bookkeeping (perf only, no effect on the datapath)
++    //
++    // Per line/way: installed by a prefetch, and touched by a demand access
++    // since. Per MSHR entry: the entry's own prefetch bit, the root of the
++    // chain it belongs to, and whether a demand access has joined that chain.
++    // A fill (keyed by its root id) installs the line with those two bits, so
++    // chain members completed by the fill-forward port count as a use.
++    // ========================================================================
++    reg [NUM_WAYS-1:0] pf_line_r   [`CS_LINES_PER_BANK];
++    reg [NUM_WAYS-1:0] used_line_r [`CS_LINES_PER_BANK];
++    reg [MSHR_SIZE-1:0] pf_own_r, pf_joined_r;
++    reg [MSHR_ADDR_WIDTH-1:0] pf_root_r [MSHR_SIZE];
++    reg pf_fill_st0, used_fill_st0;
++
++    wire pf_st0 = st0.req.attr[MEM_ATTR_PREFETCH_OFFS];
++    wire pf_st1 = st1.req.attr[MEM_ATTR_PREFETCH_OFFS];
++    wire pf_stc = stC.req.attr[MEM_ATTR_PREFETCH_OFFS];
++    wire [MSHR_ADDR_WIDTH-1:0] pf_prev_root_st1 = pf_root_r[st1.lk.mshr_previd];
++    // an entry kept at S1 is a miss: a new chain root, or a link behind previd
++    wire mshr_keep_st1 = mshr_finalize_st1 && ~mshr_release_st1 && ~pipe_stall;
++    wire pf_install_st0 = do_fill_st0 && ~st0.req.is_passthru_fill && ~pipe_stall;
++    wire [NUM_WAYS-1:0] flush_way_oh_st0 = NUM_WAYS'(1'b1) << st0.req.way_idx;
++
++    always @(posedge clk) begin
++        if (~pipe_stall) begin
++            pf_fill_st0   <= pf_own_r[mem_rsp_id];
++            used_fill_st0 <= pf_joined_r[mem_rsp_id];
++        end
++        if (mshr_keep_st1) begin
++            pf_own_r[st1.req.mshr_id] <= pf_st1;
++            if (st1.lk.mshr_pending) begin
++                pf_root_r[st1.req.mshr_id] <= pf_prev_root_st1;
++                if (~pf_st1) begin
++                    pf_joined_r[pf_prev_root_st1] <= 1'b1;
++                end
++            end else begin
++                pf_root_r[st1.req.mshr_id]   <= st1.req.mshr_id;
++                pf_joined_r[st1.req.mshr_id] <= 1'b0;
++            end
++        end
++        // a write-through flush clears every way of the line in one pass; a
++        // write-back flush walks (line, way) pairs.
++        if (do_init_st0 || (do_flush_st0 && !WRITEBACK && ~pipe_stall)) begin
++            pf_line_r[line_idx_st0]   <= '0;
++            used_line_r[line_idx_st0] <= '0;
++        end else if (do_flush_st0 && ~pipe_stall) begin
++            pf_line_r[line_idx_st0]   <= pf_line_r[line_idx_st0] & ~flush_way_oh_st0;
++            used_line_r[line_idx_st0] <= used_line_r[line_idx_st0] & ~flush_way_oh_st0;
++        end
++        if (pf_install_st0) begin
++            pf_line_r[line_idx_st0]   <= (pf_line_r[line_idx_st0] & ~fill_way_oh_st0) | (fill_way_oh_st0 & {NUM_WAYS{pf_fill_st0}});
++            used_line_r[line_idx_st0] <= (used_line_r[line_idx_st0] & ~fill_way_oh_st0) | (fill_way_oh_st0 & {NUM_WAYS{used_fill_st0}});
++        end
++        if (do_lookup_st0 && lk_st0.is_hit && ~pf_st0 && ~pipe_stall) begin
++            used_line_r[line_idx_st0] <= used_line_r[line_idx_st0] | tag_matches_st0;
++        end
++    end
++
++    // TODO (assignment 2, Part B): replace the three constants below with the
++    // prefetch events, each a one-cycle pulse (the cache pop-counts them across
++    // banks every cycle):
++    //   pf_fill_req_stc: a prefetch read leaves the commit stage as a miss that
++    //                    issues a new fill (not a hit, not chained to a pending MSHR)
++    //   pf_victim_st0  : a fill installs over a way that a prefetch filled and no
++    //                    demand access has hit since
++    //   pf_late_st1    : a demand miss is linked behind a chain whose root is a prefetch
++    wire pf_fill_req_stc = 1'b0;
++    wire pf_victim_st0   = 1'b0;
++    wire pf_late_st1     = 1'b0;
++
++    assign perf_pf_req    = pf_fill_req_stc;
++    assign perf_pf_unused = pf_victim_st0;
++    assign perf_pf_late   = pf_late_st1;
+ `endif
+ 
+ `ifdef DBG_TRACE_CACHE
+diff --git a/hw/rtl/cache/VX_cache_define.vh b/hw/rtl/cache/VX_cache_define.vh
+--- a/hw/rtl/cache/VX_cache_define.vh
++++ b/hw/rtl/cache/VX_cache_define.vh
+@@ -88,7 +88,10 @@
+     `PERF_COUNTER_ADD (dst, src, bank_stalls, PERF_CTR_BITS, count, (count > 1)) \
+     `PERF_COUNTER_ADD (dst, src, mshr_stalls, PERF_CTR_BITS, count, (count > 1)) \
+     `PERF_COUNTER_ADD (dst, src, mem_stalls, PERF_CTR_BITS, count, (count > 1)) \
+-    `PERF_COUNTER_ADD (dst, src, crsp_stalls, PERF_CTR_BITS, count, (count > 1))
++    `PERF_COUNTER_ADD (dst, src, crsp_stalls, PERF_CTR_BITS, count, (count > 1)) \
++    `PERF_COUNTER_ADD (dst, src, prefetch_reqs, PERF_CTR_BITS, count, (count > 1)) \
++    `PERF_COUNTER_ADD (dst, src, prefetch_unused, PERF_CTR_BITS, count, (count > 1)) \
++    `PERF_COUNTER_ADD (dst, src, prefetch_late, PERF_CTR_BITS, count, (count > 1))
+ 
+ ///////////////////////////////////////////////////////////////////////////////
+ 
+diff --git a/hw/rtl/cache/VX_cache_wrap.sv b/hw/rtl/cache/VX_cache_wrap.sv
+--- a/hw/rtl/cache/VX_cache_wrap.sv
++++ b/hw/rtl/cache/VX_cache_wrap.sv
+@@ -211,6 +211,9 @@ module VX_cache_wrap import VX_gpu_pkg::*; #(
+         assign cache_perf.mshr_stalls  = '0;
+         assign cache_perf.mem_stalls   = perf_mem_stalls;
+         assign cache_perf.crsp_stalls  = perf_crsp_stalls;
++        assign cache_perf.prefetch_reqs   = '0;
++        assign cache_perf.prefetch_unused = '0;
++        assign cache_perf.prefetch_late   = '0;
+     `endif
+     end
+ `ifdef DBG_TRACE_CACHE
+diff --git a/hw/rtl/core/VX_csr_data.sv b/hw/rtl/core/VX_csr_data.sv
+--- a/hw/rtl/core/VX_csr_data.sv
++++ b/hw/rtl/core/VX_csr_data.sv
+@@ -455,6 +455,9 @@ import VX_fpu_pkg::*;
+                         `CSR_READ_64(`VX_CSR_MPM_DCACHE_EVICTS, dcr_data_w, sysmem_perf.dcache.evictions);
+                         `CSR_READ_64(`VX_CSR_MPM_DCACHE_BANK_ST, dcr_data_w, sysmem_perf.dcache.bank_stalls);
+                         `CSR_READ_64(`VX_CSR_MPM_DCACHE_MSHR_ST, dcr_data_w, sysmem_perf.dcache.mshr_stalls);
++                        `CSR_READ_64(`VX_CSR_MPM_DCACHE_PF_REQS, dcr_data_w, sysmem_perf.dcache.prefetch_reqs);
++                        `CSR_READ_64(`VX_CSR_MPM_DCACHE_PF_UNUSED, dcr_data_w, sysmem_perf.dcache.prefetch_unused);
++                        `CSR_READ_64(`VX_CSR_MPM_DCACHE_PF_LATE, dcr_data_w, sysmem_perf.dcache.prefetch_late);
+                         default:;
+                         endcase
+                     end

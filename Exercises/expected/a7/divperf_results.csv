@@ -1,0 +1,7 @@
+config,version,instrs,cycles,simt_util_pct,occupancy,divergent_branches,IPC
+4 warps,shipped,78408,203187,51,4.0 (100%),64,0.386
+4 warps,remapped,39748,202555,100,2.0 (51%),0,0.196
+8 warps,shipped,156816,352127,51,8.0 (100%),128,0.445
+8 warps,remapped,79496,210927,100,4.1 (51%),0,0.377
+16 warps,shipped,313632,781186,51,15.8 (99%),256,0.401
+16 warps,remapped,158992,396236,100,8.1 (51%),0,0.401

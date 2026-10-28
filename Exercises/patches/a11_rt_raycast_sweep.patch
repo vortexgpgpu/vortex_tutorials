@@ -1,0 +1,576 @@
+diff --git a/tests/raytracing/rt_raycast_sweep/Makefile b/tests/raytracing/rt_raycast_sweep/Makefile
+new file mode 100644
+index 0000000..14c51ff
+--- /dev/null
++++ b/tests/raytracing/rt_raycast_sweep/Makefile
+@@ -0,0 +1,26 @@
++ROOT_DIR := $(realpath ../../..)
++include $(ROOT_DIR)/config.mk
++
++CONFIGS := $(if $(findstring -DVX_CFG_EXT_RTU_ENABLE,$(CONFIGS)),$(CONFIGS),$(CONFIGS) -DVX_CFG_EXT_RTU_ENABLE)
++# CW-BVH width is a sweep axis: pass -DVX_CFG_RTU_BVH_WIDTH=6 in CONFIGS (to
++# both this build and blackbox.sh) to walk a 6-wide tree; default 4.
++CONFIGS := $(if $(findstring -DVX_CFG_RTU_BVH_WIDTH,$(CONFIGS)),$(CONFIGS),$(CONFIGS) -DVX_CFG_RTU_BVH_WIDTH=4)
++
++PROJECT := rt_raycast_sweep
++
++SRC_DIR := $(VORTEX_HOME)/tests/raytracing/$(PROJECT)
++
++SRCS := $(SRC_DIR)/main.cpp
++
++VX_SRCS := $(SRC_DIR)/kernel.cpp
++
++# Reuse the regression/raycast OBJ assets (sphere.obj by default).
++CXXFLAGS += -DASSETS_PATHS='"$(VORTEX_HOME)/tests/regression/raycast/assets"'
++
++# Default to a small mesh + resolution so the CW-BVH4 fits the RTU
++# per-lane pre-fetch budget and the simx run stays within the test cap.
++OPTS ?= -m $(VORTEX_HOME)/tests/regression/raycast/assets/cube.obj -w 32 -h 24
++
++KERNEL_LIB := vortex2
++
++include ../common.mk
+diff --git a/tests/raytracing/rt_raycast_sweep/common.h b/tests/raytracing/rt_raycast_sweep/common.h
+new file mode 100644
+index 0000000..76d4be9
+--- /dev/null
++++ b/tests/raytracing/rt_raycast_sweep/common.h
+@@ -0,0 +1,111 @@
++// Copyright © 2019-2023
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++// http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++//
++// rt_raycast — a port of tests/regression/raycast whose per-pixel ray /
++// scene intersection runs on the PRISM RTU instead of a software BVH
++// traversal. The host loads an OBJ mesh, builds a CW-BVH4 acceleration
++// structure (1 triangle per leaf so the RTU's gl_GeometryIndexEXT recovers
++// the global triangle index), and the kernel fires one primary ray per
++// pixel through vx_rt_wtrace / vx_rt_wait, then shades the hit with a single
++// diffuse light. Shared host/device definitions live here.
++
++#ifndef _RT_RAYCAST_COMMON_H_
++#define _RT_RAYCAST_COMMON_H_
++
++#include <stdint.h>
++
++#ifdef __cplusplus
++#include <cmath>
++#endif
++
++// ── minimal float3 (host + device) ──────────────────────────────────
++typedef struct vec3 {
++  float x, y, z;
++} vec3;
++
++static inline vec3 v3(float x, float y, float z) { vec3 r = {x, y, z}; return r; }
++static inline vec3 v3add(vec3 a, vec3 b) { return v3(a.x+b.x, a.y+b.y, a.z+b.z); }
++static inline vec3 v3sub(vec3 a, vec3 b) { return v3(a.x-b.x, a.y-b.y, a.z-b.z); }
++static inline vec3 v3scale(vec3 a, float s) { return v3(a.x*s, a.y*s, a.z*s); }
++static inline float v3dot(vec3 a, vec3 b) { return a.x*b.x + a.y*b.y + a.z*b.z; }
++static inline vec3 v3cross(vec3 a, vec3 b) {
++  return v3(a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x);
++}
++static inline float v3len(vec3 a) { return sqrtf(v3dot(a, a)); }
++static inline vec3 v3norm(vec3 a) {
++  float l = v3len(a);
++  float inv = (l > 0.f) ? (1.f / l) : 0.f;
++  return v3scale(a, inv);
++}
++
++// ── CW-BVH4 on-disk layout (mirror of sim/simx/rtu/rtu_bvh.h) ────────
++#define VX_BVH_SCENE_KIND          2      // kRtuSceneKindBvh4
++#define VX_BVH_SCENE_HDR_BYTES     16
++#define VX_BVH_NODE_BYTES          64     // CW-BVH4 internal node
++#define VX_BVH_WIDTH               4
++#define VX_BVH_LEAF_HDR_BYTES      16
++#define VX_BVH_TRI_STRIDE          40
++#define VX_BVH_TRI_FLAGS_OFFSET    36
++
++// CW-BVH4 internal-node field byte offsets.
++#define VX_BVH_OFF_ORIGIN          4      // float[3]
++#define VX_BVH_OFF_EXP             16     // int8[3]
++#define VX_BVH_OFF_CHILD           20     // uint32[4]
++#define VX_BVH_OFF_QMIN            36     // uint8[4][3]
++#define VX_BVH_OFF_QMAX            48     // uint8[4][3]
++
++#define VX_BVH_KIND_INTERNAL       0
++#define VX_BVH_KIND_LEAF_TRI       1
++#define VX_BVH_COUNT_SHIFT         8
++#define VX_BVH_CHILD_LEAF_FLAG     0x80000000u
++#define VX_BVH_CHILD_EMPTY         0u
++#define VX_BVH_TRI_FLAG_OPAQUE     0x1u
++
++// Per-triangle shading record (device-side array indexed by triangle id =
++// the leaf's geometry_index). Vertex normals for barycentric interpolation.
++typedef struct {
++  vec3 n0, n1, n2;
++} tri_shade_t;
++
++typedef struct {
++  uint32_t dst_width;
++  uint32_t dst_height;
++  uint64_t dst_addr;       // framebuffer: uint32 RGB per pixel
++  uint64_t scene_addr;     // CW-BVH4 scene buffer
++  uint64_t shade_addr;     // tri_shade_t[num_tris]
++  uint32_t num_tris;
++  uint32_t pad0;
++  vec3  camera_pos;
++  vec3  camera_forward;
++  vec3  camera_right;
++  vec3  camera_up;
++  float viewplane_x;
++  float viewplane_y;
++  vec3  light_pos;
++  vec3  light_color;
++  vec3  ambient_color;
++  vec3  background_color;
++} kernel_arg_t;
++
++// Pack a [0,1] float3 colour into 0x00RRGGBB.
++static inline uint32_t pack_rgb(vec3 c) {
++  float r = c.x < 0.f ? 0.f : (c.x > 1.f ? 1.f : c.x);
++  float g = c.y < 0.f ? 0.f : (c.y > 1.f ? 1.f : c.y);
++  float b = c.z < 0.f ? 0.f : (c.z > 1.f ? 1.f : c.z);
++  uint32_t ir = (uint32_t)(r * 255.f + 0.5f);
++  uint32_t ig = (uint32_t)(g * 255.f + 0.5f);
++  uint32_t ib = (uint32_t)(b * 255.f + 0.5f);
++  return (ir << 16) | (ig << 8) | ib;
++}
++
++#endif // _RT_RAYCAST_COMMON_H_
+diff --git a/tests/raytracing/rt_raycast_sweep/kernel.cpp b/tests/raytracing/rt_raycast_sweep/kernel.cpp
+new file mode 100644
+index 0000000..46306c1
+--- /dev/null
++++ b/tests/raytracing/rt_raycast_sweep/kernel.cpp
+@@ -0,0 +1,73 @@
++// Copyright © 2019-2023
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++// http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++//
++// rt_raycast kernel — one primary ray per pixel, intersected on the RTU.
++
++#include <vx_spawn2.h>
++#include <vx_raytrace.h>
++#include "common.h"
++
++static vec3 shade_hit(const kernel_arg_t* arg, vec3 ro, vec3 rd,
++                      float t, float u, float v, uint32_t tri_id) {
++  const tri_shade_t* shade = (const tri_shade_t*)((uintptr_t)arg->shade_addr);
++  tri_shade_t s = shade[tri_id];
++
++  // Barycentric normal: rtu Möller-Trumbore returns u along (v1-v0),
++  // v along (v2-v0), so weights are (1-u-v, u, v) for (n0, n1, n2).
++  float w0 = 1.f - u - v;
++  vec3 N = v3add(v3add(v3scale(s.n0, w0), v3scale(s.n1, u)),
++                 v3scale(s.n2, v));
++  N = v3norm(N);
++
++  vec3 I = v3add(ro, v3scale(rd, t));
++  vec3 L = v3norm(v3sub(arg->light_pos, I));
++  float ndotl = v3dot(N, L);
++  if (ndotl < 0.f) ndotl = 0.f;
++
++  // ambient + lambertian diffuse (white albedo).
++  vec3 c = v3add(arg->ambient_color, v3scale(arg->light_color, ndotl));
++  return c;
++}
++
++__kernel void kernel_main(kernel_arg_t* arg) {
++  uint32_t x = blockIdx.x * blockDim.x + threadIdx.x;
++  uint32_t y = blockIdx.y;
++  if (x >= arg->dst_width || y >= arg->dst_height) return;
++
++  // Perspective primary ray (same framing as regression/raycast).
++  float x_ndc = (x + 0.5f) / arg->dst_width  - 0.5f;
++  float y_ndc = (y + 0.5f) / arg->dst_height - 0.5f;
++  float x_vp = x_ndc * arg->viewplane_x;
++  float y_vp = y_ndc * arg->viewplane_y;
++  vec3 pt_cam = v3add(v3add(v3scale(arg->camera_right, x_vp),
++                            v3scale(arg->camera_up, y_vp)),
++                      arg->camera_forward);
++  vec3 ro = arg->camera_pos;
++  vec3 rd = v3norm(pt_cam);  // camera_forward/right/up already in world space
++
++  // Fire the ray on the RTU (v2 single-issue trace).
++  vx_ray_t ray = { {ro.x, ro.y, ro.z}, {rd.x, rd.y, rd.z}, 0.001f, 1e30f };
++  uint32_t scene_lo = (uint32_t)(arg->scene_addr & 0xffffffffu);
++  uint32_t h   = vx_rt_wtrace(scene_lo, 0u, VX_RT_FLAG_OPAQUE, 0xffu, &ray);
++  vx_hit_t hit;
++  uint32_t sts = vx_rt_wait(h, &hit);
++
++  uint32_t* fb = (uint32_t*)((uintptr_t)arg->dst_addr);
++  vec3 color;
++  if (sts == VX_RT_STS_DONE_HIT) {
++    color = shade_hit(arg, ro, rd, hit.t, hit.u, hit.v, hit.primitive_id);
++  } else {
++    color = arg->background_color;
++  }
++  fb[x + y * arg->dst_width] = pack_rgb(color);
++}
+diff --git a/tests/raytracing/rt_raycast_sweep/main.cpp b/tests/raytracing/rt_raycast_sweep/main.cpp
+new file mode 100644
+index 0000000..cd35135
+--- /dev/null
++++ b/tests/raytracing/rt_raycast_sweep/main.cpp
+@@ -0,0 +1,342 @@
++// Copyright © 2019-2023
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++// http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++//
++// rt_raycast_sweep host driver: rt_raycast with the acceleration structure
++// built by the runtime library (vortex::raytrace::build_bvh_scene<W>) so the
++// CW-BVH width follows VX_CFG_RTU_BVH_WIDTH (4 or 6). Loads an OBJ mesh,
++// builds a CW-BVH (1 triangle per leaf, primitive_id = global triangle id),
++// renders it on the RTU (kernel.cpp) and validates the image against a CPU
++// reference that traces the same triangles with the same Möller-Trumbore
++// intersector + shading. Writes both as PPM for inspection.
++
++#include <iostream>
++#include <fstream>
++#include <sstream>
++#include <vector>
++#include <array>
++#include <string>
++#include <cmath>
++#include <cstring>
++#include <algorithm>
++
++#include <vortex2.h>
++#include <VX_types.h>
++#include <raytrace.h>
++#include "common.h"
++
++#ifndef ASSETS_PATHS
++#define ASSETS_PATHS "."
++#endif
++
++#define RT_CHECK(_expr)                                       \
++   do {                                                       \
++     int _ret = _expr;                                        \
++     if (0 == _ret) break;                                    \
++     printf("Error: '%s' returned %d!\n", #_expr, (int)_ret); \
++     cleanup();                                               \
++     exit(-1);                                                \
++   } while (false)
++
++// ── geometry ────────────────────────────────────────────────────────
++struct Tri {
++  vec3 v0, v1, v2;
++  vec3 n0, n1, n2;
++  vec3 cmin, cmax, centroid;
++};
++
++static void tri_bounds(Tri& t) {
++  t.cmin = v3(std::min({t.v0.x, t.v1.x, t.v2.x}),
++              std::min({t.v0.y, t.v1.y, t.v2.y}),
++              std::min({t.v0.z, t.v1.z, t.v2.z}));
++  t.cmax = v3(std::max({t.v0.x, t.v1.x, t.v2.x}),
++              std::max({t.v0.y, t.v1.y, t.v2.y}),
++              std::max({t.v0.z, t.v1.z, t.v2.z}));
++  t.centroid = v3scale(v3add(t.cmin, t.cmax), 0.5f);
++}
++
++// ── OBJ loader (positions + normals + triangulated faces) ───────────
++static bool load_obj(const std::string& path, std::vector<Tri>& tris) {
++  std::ifstream f(path);
++  if (!f.is_open()) { std::cerr << "cannot open " << path << "\n"; return false; }
++  std::vector<vec3> pos, nrm;
++  std::string line;
++  auto parse_idx = [](const std::string& tok, int& p, int& n) {
++    p = n = 0;
++    size_t s1 = tok.find('/');
++    if (s1 == std::string::npos) { p = std::stoi(tok); return; }
++    p = std::stoi(tok.substr(0, s1));
++    size_t s2 = tok.find('/', s1 + 1);
++    if (s2 != std::string::npos && s2 + 1 < tok.size())
++      n = std::stoi(tok.substr(s2 + 1));
++  };
++  while (std::getline(f, line)) {
++    std::istringstream iss(line);
++    std::string ty; iss >> ty;
++    if (ty == "v") { vec3 v; iss >> v.x >> v.y >> v.z; pos.push_back(v); }
++    else if (ty == "vn") { vec3 n; iss >> n.x >> n.y >> n.z; nrm.push_back(n); }
++    else if (ty == "f") {
++      std::vector<std::string> verts; std::string t;
++      while (iss >> t) verts.push_back(t);
++      for (size_t j = 1; j + 1 < verts.size(); ++j) {
++        int p[3], n[3];
++        parse_idx(verts[0],   p[0], n[0]);
++        parse_idx(verts[j],   p[1], n[1]);
++        parse_idx(verts[j+1], p[2], n[2]);
++        Tri tr;
++        tr.v0 = pos[p[0]-1]; tr.v1 = pos[p[1]-1]; tr.v2 = pos[p[2]-1];
++        if (!nrm.empty() && n[0] && n[1] && n[2]) {
++          tr.n0 = nrm[n[0]-1]; tr.n1 = nrm[n[1]-1]; tr.n2 = nrm[n[2]-1];
++        } else {
++          vec3 fn = v3norm(v3cross(v3sub(tr.v1, tr.v0), v3sub(tr.v2, tr.v0)));
++          tr.n0 = tr.n1 = tr.n2 = fn;
++        }
++        tri_bounds(tr);
++        tris.push_back(tr);
++      }
++    }
++  }
++  return !tris.empty();
++}
++
++// ── CW-BVH4 builder (recursive median split, ≤4 children, 1 tri/leaf) ─
++// ── Möller-Trumbore (identical to sim/simx/rtu/rtu_isect.cpp) ────────
++static bool ray_tri(const vec3& ro, const vec3& rd, const Tri& t,
++                    float tmin, float tmax, float& out_t, float& out_u, float& out_v) {
++  vec3 e1 = v3sub(t.v1, t.v0), e2 = v3sub(t.v2, t.v0);
++  vec3 P = v3cross(rd, e2);
++  float det = v3dot(e1, P);
++  const float EPS = 1e-6f;
++  if (det > -EPS && det < EPS) return false;
++  float inv = 1.0f / det;
++  vec3 T = v3sub(ro, t.v0);
++  float u = v3dot(T, P) * inv;
++  if (u < 0.f || u > 1.f) return false;
++  vec3 Q = v3cross(T, e1);
++  float v = v3dot(rd, Q) * inv;
++  if (v < 0.f || u + v > 1.f) return false;
++  float tt = v3dot(e2, Q) * inv;
++  if (tt < tmin || tt > tmax) return false;
++  out_t = tt; out_u = u; out_v = v;
++  return true;
++}
++
++static vec3 shade(const kernel_arg_t& arg, const std::vector<Tri>& tris,
++                  vec3 ro, vec3 rd, float t, float u, float v, uint32_t id) {
++  const Tri& tr = tris[id];
++  float w0 = 1.f - u - v;
++  vec3 N = v3norm(v3add(v3add(v3scale(tr.n0, w0), v3scale(tr.n1, u)),
++                        v3scale(tr.n2, v)));
++  vec3 I = v3add(ro, v3scale(rd, t));
++  vec3 L = v3norm(v3sub(arg.light_pos, I));
++  float nl = v3dot(N, L); if (nl < 0.f) nl = 0.f;
++  return v3add(arg.ambient_color, v3scale(arg.light_color, nl));
++}
++
++// ── globals / cleanup ───────────────────────────────────────────────
++vx_device_h device = nullptr;
++vx_buffer_h scene_buf = nullptr, shade_buf = nullptr, fb_buf = nullptr;
++vx_queue_h  queue = nullptr;
++vx_module_h module_ = nullptr;
++vx_kernel_h kernel = nullptr;
++void cleanup() {
++  if (device) {
++    if (scene_buf) vx_buffer_release(scene_buf);
++    if (shade_buf) vx_buffer_release(shade_buf);
++    if (fb_buf)    vx_buffer_release(fb_buf);
++    if (kernel)    vx_kernel_release(kernel);
++    if (module_)   vx_module_release(module_);
++    if (queue)     vx_queue_release(queue);
++    vx_device_dump_perf(device, stdout);
++    vx_device_release(device);
++  }
++}
++
++static void write_ppm(const std::string& path, const std::vector<uint32_t>& img,
++                      uint32_t w, uint32_t h) {
++  std::ofstream f(path, std::ios::binary);
++  f << "P6\n" << w << " " << h << "\n255\n";
++  for (uint32_t i = 0; i < w * h; ++i) {
++    uint32_t c = img[i];
++    unsigned char rgb[3] = { (unsigned char)((c >> 16) & 0xff),
++                             (unsigned char)((c >> 8) & 0xff),
++                             (unsigned char)(c & 0xff) };
++    f.write((const char*)rgb, 3);
++  }
++}
++
++int main(int argc, char** argv) {
++  std::string obj = std::string(ASSETS_PATHS) + "/sphere.obj";
++  uint32_t W = 32, H = 24;
++  std::string out = "output.ppm";
++  for (int i = 1; i < argc; ++i) {
++    std::string a = argv[i];
++    if (a == "-m" && i+1 < argc) obj = argv[++i];
++    else if (a == "-w" && i+1 < argc) W = std::stoi(argv[++i]);
++    else if (a == "-h" && i+1 < argc) H = std::stoi(argv[++i]);
++    else if (a == "-o" && i+1 < argc) out = argv[++i];
++  }
++
++  std::vector<Tri> tris;
++  if (!load_obj(obj, tris)) return 1;
++  std::cout << "loaded " << obj << ": " << tris.size() << " triangles\n";
++
++  // Build the CW-BVH<W> with the runtime's binned-SAH builder.
++  std::vector<vortex::raytrace::host_tri_t> htris(tris.size());
++  for (uint32_t i = 0; i < tris.size(); ++i) {
++    auto& t = tris[i];
++    htris[i] = { {t.v0.x, t.v0.y, t.v0.z}, {t.v1.x, t.v1.y, t.v1.z},
++                 {t.v2.x, t.v2.y, t.v2.z}, RTU_BVH_FLAG_OPAQUE };
++  }
++  vortex::raytrace::host_bvh_t src = { htris.data(), (uint32_t)htris.size(), 0 };
++  std::vector<uint8_t> scene;
++  uint64_t root_offset = 0;
++  if (!vortex::raytrace::build_bvh_scene<VX_CFG_RTU_BVH_WIDTH>(src, scene, root_offset)) {
++    std::cerr << "build_bvh_scene failed (empty mesh or scene exceeds the RTU pre-fetch budget)\n";
++    return 1;
++  }
++  std::cout << "CW-BVH" << VX_CFG_RTU_BVH_WIDTH << ": " << scene.size()
++            << " bytes, root @" << root_offset << "\n";
++
++  // Per-triangle shading data (indexed by primitive_id = tri id).
++  std::vector<tri_shade_t> shade_arr(tris.size());
++  for (uint32_t i = 0; i < tris.size(); ++i)
++    shade_arr[i] = tri_shade_t{ tris[i].n0, tris[i].n1, tris[i].n2 };
++
++  // Camera framing from mesh bounds.
++  vec3 mn = v3(1e30f,1e30f,1e30f), mx = v3(-1e30f,-1e30f,-1e30f);
++  for (auto& t : tris) {
++    mn = v3(std::min(mn.x,t.cmin.x), std::min(mn.y,t.cmin.y), std::min(mn.z,t.cmin.z));
++    mx = v3(std::max(mx.x,t.cmax.x), std::max(mx.y,t.cmax.y), std::max(mx.z,t.cmax.z));
++  }
++  vec3 center = v3scale(v3add(mn, mx), 0.5f);
++  float radius = 0.5f * v3len(v3sub(mx, mn));
++
++  kernel_arg_t arg = {};
++  arg.dst_width = W; arg.dst_height = H; arg.num_tris = (uint32_t)tris.size();
++  vec3 view_dir = v3norm(v3(0.4f, 0.35f, 1.0f));
++  arg.camera_pos = v3add(center, v3scale(view_dir, 2.6f * radius));
++  arg.camera_forward = v3norm(v3sub(center, arg.camera_pos));
++  vec3 world_up = v3(0.f, 1.f, 0.f);
++  arg.camera_right = v3norm(v3cross(arg.camera_forward, world_up));
++  arg.camera_up = v3cross(arg.camera_right, arg.camera_forward);
++  float aspect = (float)W / (float)H;
++  float half_h = std::tan(0.5f * 50.0f * 3.14159265f / 180.0f);
++  arg.viewplane_y = 2.0f * half_h;
++  arg.viewplane_x = arg.viewplane_y * aspect;
++  arg.light_pos = v3add(center, v3(3.f*radius, 4.f*radius, 2.f*radius));
++  arg.light_color = v3(0.9f, 0.85f, 0.75f);
++  arg.ambient_color = v3(0.12f, 0.12f, 0.15f);
++  arg.background_color = v3(0.05f, 0.06f, 0.08f);
++
++  // ── device render ─────────────────────────────────────────────────
++  RT_CHECK(vx_device_open(0, &device));
++  vx_queue_info_t qi = { sizeof(qi), nullptr, VX_QUEUE_PRIORITY_NORMAL, 0 };
++  RT_CHECK(vx_queue_create(device, &qi, &queue));
++
++  vortex::raytrace::config_t cfg;
++  cfg.scene_kind = (VX_CFG_RTU_BVH_WIDTH == 6) ? RTU_SCENE_KIND_BVH6 : RTU_SCENE_KIND_BVH4;
++  cfg.bvh_width  = VX_CFG_RTU_BVH_WIDTH;
++  RT_CHECK(vortex::raytrace::program(device, cfg));
++
++  RT_CHECK(vx_buffer_create(device, (uint32_t)scene.size(), VX_MEM_READ, &scene_buf));
++  RT_CHECK(vx_buffer_address(scene_buf, &arg.scene_addr));
++  RT_CHECK(vx_buffer_create(device, (uint32_t)(shade_arr.size()*sizeof(tri_shade_t)),
++                            VX_MEM_READ, &shade_buf));
++  RT_CHECK(vx_buffer_address(shade_buf, &arg.shade_addr));
++  uint32_t fb_bytes = W * H * sizeof(uint32_t);
++  RT_CHECK(vx_buffer_create(device, fb_bytes, VX_MEM_WRITE, &fb_buf));
++  RT_CHECK(vx_buffer_address(fb_buf, &arg.dst_addr));
++
++  RT_CHECK(vx_enqueue_write(queue, scene_buf, 0, scene.data(),
++                            (uint32_t)scene.size(), 0, nullptr, nullptr));
++  RT_CHECK(vx_enqueue_write(queue, shade_buf, 0, shade_arr.data(),
++                            (uint32_t)(shade_arr.size()*sizeof(tri_shade_t)),
++                            0, nullptr, nullptr));
++
++  RT_CHECK(vx_module_load_file(device, "kernel.vxbin", &module_));
++  RT_CHECK(vx_module_get_kernel(module_, "main", &kernel));
++
++  uint64_t num_threads = 1;
++  vx_device_query(device, VX_CAPS_NUM_THREADS, &num_threads);
++  if (num_threads == 0) num_threads = 1;
++
++  std::cout << "render " << W << "x" << H << " on RTU\n";
++  vx_event_h lev = nullptr, rev = nullptr;
++  {
++    vx_launch_info_t li = {};
++    li.struct_size = sizeof(li);
++    li.kernel = kernel; li.args_host = &arg; li.args_size = sizeof(arg);
++    li.ndim = 2;
++    li.grid_dim[0] = (W + num_threads - 1) / num_threads;
++    li.grid_dim[1] = H;
++    li.block_dim[0] = (uint32_t)num_threads;
++    li.block_dim[1] = 1;
++    RT_CHECK(vx_enqueue_launch(queue, &li, 0, nullptr, &lev));
++  }
++  std::vector<uint32_t> dev_img(W * H, 0);
++  RT_CHECK(vx_enqueue_read(queue, dev_img.data(), fb_buf, 0, fb_bytes, 1, &lev, &rev));
++  RT_CHECK(vx_event_wait_value(rev, 1, VX_TIMEOUT_INFINITE));
++  vx_event_release(rev); vx_event_release(lev);
++
++  // ── CPU reference (brute force over the same triangles) ───────────
++  std::vector<uint32_t> ref_img(W * H, 0);
++  for (uint32_t y = 0; y < H; ++y) {
++    for (uint32_t x = 0; x < W; ++x) {
++      float xn = (x + 0.5f) / W - 0.5f, yn = (y + 0.5f) / H - 0.5f;
++      vec3 pc = v3add(v3add(v3scale(arg.camera_right, xn*arg.viewplane_x),
++                            v3scale(arg.camera_up, yn*arg.viewplane_y)),
++                      arg.camera_forward);
++      vec3 ro = arg.camera_pos, rd = v3norm(pc);
++      float best_t = 1e30f, bu = 0, bv = 0; uint32_t bid = 0; bool hit = false;
++      for (uint32_t i = 0; i < tris.size(); ++i) {
++        float tt, uu, vv;
++        if (ray_tri(ro, rd, tris[i], 0.001f, best_t, tt, uu, vv)) {
++          best_t = tt; bu = uu; bv = vv; bid = i; hit = true;
++        }
++      }
++      vec3 c = hit ? shade(arg, tris, ro, rd, best_t, bu, bv, bid)
++                   : arg.background_color;
++      ref_img[x + y*W] = pack_rgb(c);
++    }
++  }
++
++  write_ppm(out, dev_img, W, H);
++  write_ppm("reference.ppm", ref_img, W, H);
++
++  // ── compare ───────────────────────────────────────────────────────
++  uint32_t mismatch = 0, maxdiff = 0;
++  for (uint32_t i = 0; i < W*H; ++i) {
++    uint32_t a = dev_img[i], r = ref_img[i];
++    int dr = std::abs((int)((a>>16)&0xff) - (int)((r>>16)&0xff));
++    int dg = std::abs((int)((a>>8)&0xff)  - (int)((r>>8)&0xff));
++    int db = std::abs((int)(a&0xff)       - (int)(r&0xff));
++    int d = std::max({dr, dg, db});
++    if ((uint32_t)d > maxdiff) maxdiff = d;
++    if (d > 16) ++mismatch;   // count silhouette/edge flips and tone breaks
++  }
++  float frac = (float)mismatch / (float)(W*H);
++  std::cout << "compare: maxdiff=" << maxdiff << " mismatched=" << mismatch
++            << "/" << (W*H) << " (" << (frac*100.f) << "%)\n";
++  std::cout << "wrote " << out << " and reference.ppm\n";
++
++  cleanup();
++
++  // Allow a small fraction of edge pixels to differ (float rounding between
++  // x86 host and RISC-V softfloat flips a handful of silhouette samples).
++  if (frac > 0.03f) {
++    std::cout << "FAILED (too many mismatched pixels)\n";
++    return 1;
++  }
++  std::cout << "PASSED!\n";
++  return 0;
++}

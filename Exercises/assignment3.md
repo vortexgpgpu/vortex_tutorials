@@ -1,802 +1,443 @@
-# Assignment #3: GPU Software Prefetching (SimX)
+# Assignment 3: VX_DOT8, an int8 Dot-Product Instruction
 
-> Targets Vortex release [v2.3](https://github.com/vortexgpgpu/vortex/releases/tag/v2.3).
+> Targets Vortex release [v3.0](https://github.com/vortexgpgpu/vortex/releases/tag/v3.0).
 
-This assignment will be divided into two parts. The first part involves adding a new prefetch instruction as well as a corresponding flag bit to identify if it has been prefetched. The second involves adding three performance counters to measure the following:
+## Background
 
-1. Number of unique prefetch requests to main memory
-2. Number of unused prefetched blocks
-3. Number of late prefetches
+Quantized neural networks run on 8-bit integers. Every GPU vendor ships an
+instruction that multiplies four int8 pairs and adds the products in one go
+(NVIDIA `dp4a`, AMD `v_dot4_i32_i8`), so one instruction does the work of four
+multiply-adds. In this assignment you add such an instruction, `VX_DOT8`, to
+Vortex: to the ISA, to the SimX simulator (Part A), to the RTL (Part B), and,
+optionally, you synthesize your unit for an ASIC library (Part C).
 
-All of these counters should be implemented in `cache_sim.h`
+**Semantics.** Each source register holds four signed 8-bit values; the
+result is their signed 32-bit dot product:
 
-## Part 1: Adding Prefetch Instruction to SimX
+```
+rs1 = {A3, A2, A1, A0}     (A0 in bits 7:0)
+rs2 = {B3, B2, B1, B0}
+rd  = A0*B0 + A1*B1 + A2*B2 + A3*B3      (int32)
+```
 
-To begin, we will add the prefetch instruction in a new group of instructions. Then we want to develop a testing directory and script to ensure correctness and functionality
+**Encoding.** R-type, in the RISC-V custom-0 opcode space:
 
-### Step 1: Adding Prefetch Intrinsic
+```
+| funct7  | rs2    | rs1    | funct3 | rd     | opcode  |
+| 0000110 | 5 bits | 5 bits | 000    | 5 bits | 0001011 |
+```
 
-First, add the prefetch intrinsic to `/kernel/include/vx_intrinsics.h` (right after `vx_barrier()`)
+`opcode = 0x0B` (custom-0), `funct3 = 0`, **`funct7 = 6`**. In v3.0, custom-0
+`funct7` 0–4 are taken (warp control, vote/shuffle, TCU, DXA, packed loads) and
+5 is used by the prefetch of Assignment 2; an unknown `funct7` makes SimX abort.
+
+**Latency.** The unit has a configurable pipeline depth,
+`VX_CFG_DOT8_LATENCY` (default 2), defined once in `VX_config.toml` so SimX and
+the RTL read the same value.
+
+**The benchmark.** `C = A × B` for N×N int8 matrices with int32 results, one
+output element per thread. The baseline kernel does one multiply-add per
+element; the DOT8 kernel loads four consecutive bytes of the A row with one
+32-bit load, gathers four bytes of the B column, and does one `vx_dot8`.
+
+## Setup
+
+Clone the v3.0 release and build it out of tree. If you fetched the `v3.0`
+tag before 2026-10-07, refresh it first with `git fetch --tags --force`.
+
+```bash
+git clone --branch v3.0 --recursive https://github.com/vortexgpgpu/vortex.git
+cd vortex
+mkdir build32 && cd build32
+../configure --xlen=32 --tooldir=$HOME/tools
+./ci/toolchain_install.sh --all     # prebuilt toolchain (incl. Yosys/OpenSTA), first time only
+make -s
+```
+
+Apply the test handout from the Vortex root:
+
+```bash
+cd vortex
+git apply ~/vortex_tutorials/Exercises/patches/a3_dot8_test.patch
+```
+
+It adds `tests/regression/dot8`: the host program (int8 inputs, exact int32
+check, `-n <size>` with `size % 4 == 0`, `-b` to launch the baseline kernel
+instead of the DOT8 kernel), the complete baseline kernel `kernel_base`, and a
+`kernel_main` whose loop you write. Both kernels live in the same `.vxbin`; the
+host picks one by name. The DOT8 kernel reports `FAILED!` until you finish
+Part A.
+
+All commands below run from `build32/`. Re-run `../configure` (same arguments)
+after editing a `*.toml` file, a Makefile, or adding a test directory.
+
+## Part A: SimX
+
+### Step A1: The intrinsic
+
+In [`sw/kernel/include/vx_intrinsics.h`](https://github.com/vortexgpgpu/vortex/blob/v3.0/sw/kernel/include/vx_intrinsics.h#L372),
+after `vx_fence()`:
 
 ```c
-// Software Prefetch
-inline void vx_prefetch(const void* addr) {
-    __asm__ volatile (".insn r %0, 0, 5, x0, %1, x0" :: "i"(RISCV_CUSTOM0), "r"(addr) : "memory");
+// DOT8: rd = a.b0*b.b0 + a.b1*b.b1 + a.b2*b.b2 + a.b3*b.b3 (int8 lanes, int32 result)
+inline __attribute__((const)) int vx_dot8(int a, int b) {
+    int ret;
+    __asm__ volatile (".insn r %1, 0, 6, %0, %2, %3" : "=r"(ret) : "i"(RISCV_CUSTOM0), "r"(a), "r"(b));
+    return ret;
 }
 ```
 
-This will create a new group for the prefetch instruction, where this instruction is an R-type instruction format
+### Step A2: The kernel
 
-### Step 2: Implement into SimX
+Complete `kernel_main` in `tests/regression/dot8/kernel.cpp` following its
+`TODO`. Two details:
 
-#### 2a: Editing `types.h`
+- Build `packedB` from `(uint32_t)(uint8_t)B[...] << (8*k)`. Without the casts,
+  a negative byte sign-extends over the other three lanes, and shifting an
+  `int` into bit 31 is undefined behaviour (the kernel builds with `-Werror`).
+- The A row is contiguous and 4-byte aligned for `size % 4 == 0`, so one
+  `*reinterpret_cast<const uint32_t*>(A + row * size + e)` packs A.
 
-Before we can decode the instruction, we need to add a new `PREFETCH` value into `LsuType` in the file `/sim/simx/types.h` 
+After building (Step A4), check the encoding in the disassembly
+(`tests/regression/dot8/kernel.dump`). `objdump` does not know the
+instruction and prints `<unknown>`; check that the word has bits 6:0 = `0x0B`,
+bits 14:12 (`funct3`) = 0 and bits 31:25 (`funct7`) = 6. For example
+`0dcf8e0b` is `vx_dot8 x28, x31, x28` (rd = bits 11:7, rs1 = bits 19:15,
+rs2 = bits 24:20); your registers may differ.
 
-```cpp
-enum class LsuType {
-  LOAD,
-  STORE,
-  FENCE,
-  PREFETCH  // ADD
-};
-```
+### Step A3: The simulator
 
-We also need a prefetch case for `std::ostream` 
+1. `VX_config.toml`, section `[alu]` ([L83](https://github.com/vortexgpgpu/vortex/blob/v3.0/VX_config.toml#L83)):
 
-```cpp
-inline std::ostream &operator<<(std::ostream &os, const LsuType& type) {
-  switch (type) {
-  case LsuType::LOAD:     os << "LOAD"; break;
-  case LsuType::STORE:    os << "STORE"; break;
-  case LsuType::FENCE:    os << "FENCE"; break;
-  case LsuType::PREFETCH: os << "PREFETCH"; break;  // ADD
-  default:
-    assert(false);
-  }
-  return os;
-}
-```
+   ```toml
+   # Pipeline depth of the VX_DOT8 int8 dot-product unit (SimX and RTL).
+   VX_CFG_DOT8_LATENCY = 2
+   ```
 
-#### 2b: Editing `decode.cpp`
+2. [`sim/simx/types.h`](https://github.com/vortexgpgpu/vortex/blob/v3.0/sim/simx/types.h#L215):
+   add `DOT8` to `enum class AluType` and a `case AluType::DOT8` to its
+   `operator<<` ([L251](https://github.com/vortexgpgpu/vortex/blob/v3.0/sim/simx/types.h#L251)).
+   Both `operator<<` and `op_string()` abort on unknown values, so a missing
+   case only crashes when you trace with `--debug`.
+3. [`sim/simx/decode.cpp`](https://github.com/vortexgpgpu/vortex/blob/v3.0/sim/simx/decode.cpp#L116):
+   add `case AluType::DOT8: return {"DOT8", ""};` to `op_string()`. In
+   `Decoder::decode()`, `case Opcode::EXT1:` →
+   `switch (funct7)` ([L826](https://github.com/vortexgpgpu/vortex/blob/v3.0/sim/simx/decode.cpp#L826)),
+   add `case 6:` with `funct3 == 0`. The instruction object is created as an
+   ALU instruction already, so you only set
+   - the op type: `instr->set_op_type(AluType::DOT8);`
+   - the arguments: `instr->set_args(IntrAluArgs{0, 0, 0});` (`execute()`
+     reads `IntrAluArgs` for every ALU op and throws without it);
+   - the registers: `set_dest_reg(rd, RegType::Integer)`,
+     `set_src_reg(0, rs1, ...)`, `set_src_reg(1, rs2, ...)`.
+4. [`sim/simx/alu_unit.cpp`](https://github.com/vortexgpgpu/vortex/blob/v3.0/sim/simx/alu_unit.cpp)
+   holds both the functional model and the timing of the ALU:
+   - **Function.** In `AluUnit::execute()` ([L98](https://github.com/vortexgpgpu/vortex/blob/v3.0/sim/simx/alu_unit.cpp#L98)),
+     `switch` on the `AluType`, add `case AluType::DOT8:` next to `CZERO`
+     ([L247](https://github.com/vortexgpgpu/vortex/blob/v3.0/sim/simx/alu_unit.cpp#L247)).
+     For every thread `t` from `thread_start` with `tmask.test(t)` set, unpack
+     the four bytes of `rs1_data[t].u32` and `rs2_data[t].u32` as `int8_t`,
+     accumulate the products in an `int32_t`, and write
+     `rd_data[t].i = sext((uint64_t)(uint32_t)sum, 32);`. Use `trace->tmask`
+     (the local `tmask`), not the warp's live mask: the warp may have diverged
+     since this instruction issued. For debugging, print each lane with
+     `DP(3, "*** DOT8[" << t << "]: a=0x" << std::hex << a << ", b=0x" << b << ", c=0x" << (uint32_t)sum << std::dec);`
+     (with `a`, `b` the packed source words).
+   - **Timing.** `AluUnit::latency_of()` ([L38](https://github.com/vortexgpgpu/vortex/blob/v3.0/sim/simx/alu_unit.cpp#L38))
+     returns the cycles an op spends beyond the single-cycle integer ALU (MUL/DIV
+     return `kMulDivLatency`). Return `VX_CFG_DOT8_LATENCY` for `DOT8`.
+   - **Queue depth.** The constructor ([L31](https://github.com/vortexgpgpu/vortex/blob/v3.0/sim/simx/alu_unit.cpp#L31))
+     sizes the output channel from the deepest path:
+     `kMulDivLatency + (kGather ? 1 : 0) + 2`, with `kMulDivLatency = 3`. In
+     that expression replace `kMulDivLatency` by
+     `std::max<uint32_t>(kMulDivLatency, VX_CFG_DOT8_LATENCY)`
+     (`#include <algorithm>`), or a latency above 3 overflows the channel.
 
-We want to update `case Opcode::EXT1:` (in the `/sim/simx/decode.cpp` file) where we add the new prefetch instruction group (right after the `case 2` instruction group)
-
-```cpp
-case 5: { // SOFTWARE PREFETCH
-	auto instr = std::allocate_shared<Instr>(instr_pool_, uuid, FUType::LSU);
-  switch (funct3) {
-	  case 0: // PREFETCH
-	    instr->setOpType(LsuType::PREFETCH);  // Make sure it is set to PREFETCH
-	    instr->setArgs(IntrLsuArgs{0, 0, 0});
-	    instr->setSrcReg(0, rs1, RegType::Integer);
-	    break;
-    default:
-      std::abort();
-  }
-  ibuffer.push_back(instr);
-} break;
-```
-
-In the `op_string()` function, we need to add a `PREFETCH` case (under the `FENCE` case)
-
-```cpp
-case LsuType::PREFETCH: return {"PREFETCH", ""};  // ADD
-```
-
-#### 2c: Editing `execute.cpp`
-
-In order for the instruction to perform a prefetch, we need to add a case for `PREFETCH` in the `execute()` function (in the `/sim/simx/execute.cpp` file)
-
-```cpp
-case LsuType::PREFETCH: {
-    auto trace_data = std::make_shared<LsuTraceData>(num_threads);
-    trace->data = trace_data;
-    
-    for (uint32_t t = thread_start; t < num_threads; ++t) {
-        if (!warp.tmask.test(t))
-            continue;
-        uint64_t prefetch_addr = rs1_data[t].u;
-        
-        // Record the prefetch address in trace
-        trace_data->mem_addrs.at(t) = {prefetch_addr, 4}; // 4 bytes or cache line size
-        
-        // Issue dummy read to populate cache
-        uint32_t dummy;
-        this->dcache_read(&dummy, prefetch_addr, sizeof(uint32_t));
-        
-        DP(2, "PREFETCH: addr=0x" << std::hex << prefetch_addr << std::dec << " (thread " << t << ")");
-    }
-} break;
-```
-
-In this implementation, we issue a dummy read in order to populate a cache. This will trigger SimX to place data (from an address) into cache, essentially prefetching the data. The instruction will not modify or perform anything outside of that.
-
-### Step 3: Creating Test Application
-
-#### 3a: Creating Test Directory
-
-In `/tests/regression/`, we want to duplicate the `fence` folder and rename it to `prefetch` 
+### Step A4: Build and test
 
 ```bash
-# Create prefetch test from fence test
-cp -r tests/regression/fence tests/regression/prefetch
-cd tests/regression/prefetch
-
-# Modify the Makefile
-sed -i 's/PROJECT=fence/PROJECT=prefetch/g' Makefile
-```
-
-You should now have the `/tests/regression/prefetch` directory, this will be our testing directory for our new instruction
-
-**Note:** When cloning, make sure you go into `Makefile` and adjust the project name to `prefetch`
-
-#### 3b: Modify Test Script
-
-We will need to modify `kernel.cpp` (in the testing directory) and add a call to `vx_prefetch()` 
-
-```cpp
-#include <vx_spawn.h>
-#include <vx_intrinsics.h>  // ADD
-#include "common.h"
-
-void kernel_body(kernel_arg_t* __UNIFORM__ arg) {
-	uint32_t count    = arg->task_size;
-	int32_t* src0_ptr = (int32_t*)arg->src0_addr;
-	int32_t* src1_ptr = (int32_t*)arg->src1_addr;
-	int32_t* dst_ptr  = (int32_t*)arg->dst_addr;
-
-	uint32_t offset = blockIdx.x * count;
-
-	const uint32_t elements_per_line = 16; // ADD: 64 bytes cache size / 4 bytes per int_32
-    
-  for (uint32_t i = 0; i < count; ++i) {
-	  // ADD: Only prefetch at cache line boundaries
-    if (i % elements_per_line == 0) {
-		vx_prefetch(&src0_ptr[offset + i]);
-      	vx_prefetch(&src1_ptr[offset + i]);
-    }
-        
-    dst_ptr[offset+i] = src0_ptr[offset+i] + src1_ptr[offset+i];
-  }
-
-	vx_fence();
-
-}
-
-int main() {
-	kernel_arg_t* arg = (kernel_arg_t*)csr_read(VX_CSR_MSCRATCH);
-	return vx_spawn_threads(1, &arg->num_tasks, nullptr, (vx_kernel_func_cb)kernel_body, arg);
-}
-```
-
-#### 3c: Building and Testing
-
-To check and see that the new instruction is working, run the following commands in your `/build/` directory
-
-**Note:** Check to see if you ran `source ./ci/toolchain_env.sh` before building!
-
-```bash
-# Make the build
+../configure --xlen=32 --tooldir=$HOME/tools   # toml + new test directory
 make -s
-
-# Run debug to check to see if prefetch output is printed
-./ci/blackbox.sh --driver=simx --cores=1 --app=prefetch --debug=2
+./ci/blackbox.sh --driver=simx --cores=4 --warps=4 --threads=4 --app=dot8 --args="-n128"
+./ci/blackbox.sh --driver=simx --cores=4 --warps=4 --threads=4 --app=dot8 --args="-n128 -b"
 ```
 
-All output will be in `run.log` in the `/build/` directory, check to see if `DEBUG PREFETCH: …` is present
+Both must print `PASSED!`. The host returns the error count as its exit code,
+which wraps at 256, so always read the `PASSED!`/`FAILED!` line rather than the
+exit status. Use `--debug=3` on a small size (`-n8`) to see the
+`*** DOT8[t]: a=..., b=..., c=...` lines of the `DP(3, ...)` trace you added
+in Step A3. With `--debug`, the output goes to `run.log`.
 
-## Part 2: Implementing Performance Counters
+Then sweep the four shapes, (warps, threads) ∈ {(4,4), (4,8), (8,4), (8,8)},
+for both kernels and record `PERF: instrs=..., cycles=...`. Each new shape
+rebuilds the SimX driver (10–40 s); each run at `-n128` takes 15–35 s.
 
-Now that you have prefetch instructions working in SimX, we want to implement the three performance counters to measure prefetch effectiveness
-
-### Step 1: Adding Prefetch Flags
-
-#### 1a: Editing `types.h`
-
-We want to add the `is_prefetch` flag to `LsuReq` (in the `/sim/simx/types.h` directory)
-
-```cpp
-struct LsuReq {
-  BitVector<> mask;
-  std::vector<uint64_t> addrs;
-  bool     write;
-  uint32_t tag;
-  uint32_t cid;
-  uint64_t uuid;
-  bool     is_prefetch;  // ADD
-
-  LsuReq(uint32_t size)
-    : mask(size)
-    , addrs(size, 0)
-    , write(false)
-    , tag(0)
-    , cid(0)
-    , uuid(0)
-    , is_prefetch(false)  // ADD
-  {}
-
-  friend std::ostream &operator<<(std::ostream &os, const LsuReq& req) {
-    os << "rw=" << req.write << ", mask=" << req.mask << ", addr={";
-    bool first_addr = true;
-    for (size_t i = 0; i < req.mask.size(); ++i) {
-      if (!first_addr) os << ", ";
-      first_addr = false;
-      if (req.mask.test(i)) {
-        os << "0x" << std::hex << req.addrs.at(i) << std::dec;
-      } else {
-        os << "-";
-      }
-    }
-    os << "}, tag=0x" << std::hex << req.tag << std::dec << ", cid=" << req.cid;
-    if (req.is_prefetch) os << ", prefetch=1";  // ADD
-    os << " (#" << req.uuid << ")";
-    return os;
-  }
-};
+```bash
+for wt in "4 4" "4 8" "8 4" "8 8"; do
+  set -- $wt
+  for k in "" "-b"; do
+    ./ci/blackbox.sh --driver=simx --cores=4 --warps=$1 --threads=$2 --app=dot8 \
+        --args="-n128 $k" > dot8_simx_w$1_t$2${k:+_base}.log 2>&1
+    echo "w=$1 t=$2 ${k:-dot8} $(grep -m1 'PERF: instrs' dot8_simx_w$1_t$2${k:+_base}.log)"
+  done
+done
 ```
 
-Similarly, we will add the same flag to `MemReq` 
+`-n256` has about 8× the instructions of `-n128` and takes several minutes
+per run (it was not measured for the tables below); use it only if you have
+time.
 
-```cpp
-struct MemReq {
-  uint64_t addr;
-  bool     write;
-  AddrType type;
-  uint32_t tag;
-  uint32_t cid;
-  uint64_t uuid;
-  bool     is_prefetch;  // ADD
+## Part B: RTL extension
 
-  MemReq(uint64_t _addr = 0,
-          bool _write = false,
-          AddrType _type = AddrType::Global,
-          uint64_t _tag = 0,
-          uint32_t _cid = 0,
-          uint64_t _uuid = 0,
-          bool _is_prefetch = false  // ADD
-  ) : addr(_addr)
-    , write(_write)
-    , type(_type)
-    , tag(_tag)
-    , cid(_cid)
-    , uuid(_uuid)
-    , is_prefetch(_is_prefetch)  // ADD
-  {}
+Part B implements the same instruction in the RTL. The intrinsic, kernel,
+config knob and commands are those of Part A; your SimX model is the
+reference.
 
-  friend std::ostream &operator<<(std::ostream &os, const MemReq& req) {
-    os << "rw=" << req.write << ", ";
-    os << "addr=0x" << std::hex << req.addr << std::dec << ", type=" << req.type;
-    os << ", tag=0x" << std::hex << req.tag << std::dec << ", cid=" << req.cid;
-    if (req.is_prefetch) os << ", prefetch=1";  // ADD
-    os << " (#" << req.uuid << ")";
-    return os;
-  }
-};
-```
+### File and signal map
 
-#### 1b: Editing `func_unit.cpp`
+| Part A (SimX) | Part B (RTL) |
+|---|---|
+| `AluType::DOT8` | `INST_ALU_DOT8` in [`VX_gpu_pkg.sv`](https://github.com/vortexgpgpu/vortex/blob/v3.0/hw/rtl/VX_gpu_pkg.sv#L312): take the free 4-bit code of the commented-out `INST_ALU_UNUSED = 4'b0001` |
+| `op_string()` | `INST_ALU_DOT8: TRACE("DOT8")` in [`VX_trace_pkg.sv`](https://github.com/vortexgpgpu/vortex/blob/v3.0/hw/rtl/VX_trace_pkg.sv#L101), next to `INST_ALU_CZNE` |
+| decode `case 6` | `7'h06` in `INST_EXT1: case (funct7)` of [`VX_decode.sv`](https://github.com/vortexgpgpu/vortex/blob/v3.0/hw/rtl/core/VX_decode.sv#L580) |
+| `AluUnit::execute()` + `latency_of()` | new sub-unit `hw/rtl/core/VX_alu_dot8.sv` |
+| ALU dispatch on `AluType` | a third processing element in [`VX_alu_unit.sv`](https://github.com/vortexgpgpu/vortex/blob/v3.0/hw/rtl/core/VX_alu_unit.sv#L34) |
+| `VX_CFG_DOT8_LATENCY` | same macro, generated into `build32/hw/VX_config.vh` |
 
-We need a way to mark prefetch requests in `LsuUnit::tick()` (in the `/sim/simx/func_unit.cpp` file), so we need to add functionality to our newly added `is_prefetch` flag
+### Step B1: Decode
 
-```cpp
-void LsuUnit::tick() {
-    // ...
-    
-    for (uint32_t iw = 0; iw < ISSUE_WIDTH; ++iw) {
-        // ...
-        
-        bool is_fence = false;
-        bool is_write = false;
-        bool is_prefetch = false;  // ADD
+In `VX_decode.sv`, inside `INST_EXT1: case (funct7)`, after the `7'h04` case,
+add `7'h06` with `funct3 == 3'h0`: `ex_type = EX_ALU`,
+`op_type = INST_OP_BITS'(INST_ALU_DOT8)`, `op_args.alu = '0` and then
+`op_args.alu.xtype = ALU_TYPE_ARITH`, and `` `USED_IREG `` for `rd`, `rs1`, `rs2`.
+`op_args` is a packed union that defaults to `'x`: zero the whole `alu` member
+first, or `use_imm`/`use_PC` float.
 
-        auto trace = input.front();
-        if (std::get_if<LsuType>(&trace->op_type)) {
-            auto lsu_type = std::get<LsuType>(trace->op_type);
-            is_fence = (lsu_type == LsuType::FENCE);
-            is_write = (lsu_type == LsuType::STORE);
-            is_prefetch = (lsu_type == LsuType::PREFETCH);  // ADD
-        }
-        // ...
-        
-        if (remain_addrs_ != 0) {
-            // setup memory request
-            LsuReq lsu_req(NUM_LSU_LANES);
-            lsu_req.write = is_write;
-            lsu_req.is_prefetch = is_prefetch;  // ADD
-            
-            // ...
-        }
-    }
-}
-```
+### Step B2: The DOT8 sub-unit
 
-#### 1c: Editing `cache_sim.cpp`
-
-To mimic an additional bit on the tag, we also add flag bits to the `line_t` structure (in the `/sim/simx/cache_sim.cpp`), specifically one to check if the data was prefetched and the other if it was used. These two flags will assist the counter with tracking
-
-```cpp
-struct line_t {
-    uint64_t tag;
-    uint32_t lru_ctr;
-    bool     valid;
-    bool     dirty;
-    bool     was_prefetched;  // ADD
-    bool     was_used;        // ADD
-
-    void reset() {
-        valid = false;
-        dirty = false;
-        was_prefetched = false;  // ADD
-        was_used = false;        // ADD
-    }
-};
-```
-
-Afterwards, we also need to update `bank_req_t` with the prefetch flag
-
-```cpp
-struct bank_req_t {
-    
-    // ...
-    
-    bool     is_prefetch;  // ADD
-
-    bank_req_t() {
-        this->reset();
-    }
-
-    void reset() {
-        type = ReqType::None;
-        is_prefetch = false;  // ADD
-    }
-
-    friend std::ostream &operator<<(std::ostream &os, const bank_req_t& req) {
-        os << "set=" << req.set_id << ", rw=" << req.write;
-        os << ", type=" << req.type;
-        os << ", addr_tag=0x" << std::hex << req.addr_tag;
-        os << ", req_tag=" << req.req_tag;
-        os << ", cid=" << std::dec << req.cid;
-        if (req.is_prefetch) os << ", prefetch=1";  // ADD
-        os << " (#" << req.uuid << ")";
-        return os;
-    }
-};
-```
-
-Now that we have the flags set in `cache_sim.cpp`, we want to implement logic into the `processInputs()` function
-
-```cpp
-void processInputs() {
-	// proces inputs in prioroty order
-	do {
-			
-		// ...
-
-		// second: schedule memory fill
-		if (!this->mem_rsp_port.empty()) {
-			auto& mem_rsp = mem_rsp_port.front();
-			DT(3, this->name() << "-fill-rsp: " << mem_rsp);
-			// update MSHR
-			auto& entry = mshr_.replay(mem_rsp.tag);
-			auto& set   = sets_.at(entry.bank_req.set_id);
-			auto& line  = set.lines.at(entry.line_id);
-			line.valid  = true;
-			line.tag    = entry.bank_req.addr_tag;
-			line.was_prefetched = entry.bank_req.is_prefetch;  // ADD
-    		line.was_used = false;  // ADD
-			mshr_.dequeue(&bank_req);
-			--pending_mshr_size_;
-			pipe_req_->push(bank_req);
-			mem_rsp_port.pop();
-			--pending_fill_reqs_;
-			break;
-		}
-
-		// third: schedule core request
-		if (!this->core_req_port.empty()) {
-			auto& core_req = core_req_port.front();
-			// check MSHR capacity
-			if ((!core_req.write || config_.write_back)
-			 && (pending_mshr_size_ >= mshr_.capacity())) {
-				++perf_stats_.mshr_stalls;
-				break;
-			}
-			++pending_mshr_size_;
-			DT(3, this->name() << "-core-req: " << core_req);
-			bank_req.type = bank_req_t::Core;
-			bank_req.cid = core_req.cid;
-			bank_req.uuid = core_req.uuid;
-			bank_req.set_id = params_.addr_set_id(core_req.addr);
-			bank_req.addr_tag = params_.addr_tag(core_req.addr);
-			bank_req.req_tag = core_req.tag;
-			bank_req.write = core_req.write;
-			bank_req.is_prefetch = core_req.is_prefetch;  // ADD
-			pipe_req_->push(bank_req);
-			if (core_req.write)
-				++perf_stats_.writes;
-			else
-				++perf_stats_.reads;
-			core_req_port.pop();
-			break;
-		}
-	} while (false);
-}
-```
-
-#### 1d: Editing `types.cpp`
-
-Now we want to propagate `is_prefetch` through `LsuMemAdapter` (in the `/sim/simx/types.cpp` file) so that the counter can see the flag
-
-```cpp
-// ...
-
-// process incoming requests
-if (!ReqIn.empty()) {
-  auto& in_req = ReqIn.front();
-  assert(in_req.mask.size() == input_size);
-  for (uint32_t i = 0; i < input_size; ++i) {
-    if (in_req.mask.test(i)) {
-      // build memory request
-      MemReq out_req;
-      out_req.write = in_req.write;
-      out_req.addr  = in_req.addrs.at(i);
-      out_req.is_prefetch = in_req.is_prefetch; // ADD
-      out_req.type  = get_addr_type(in_req.addrs.at(i));
-      out_req.tag   = in_req.tag;
-      out_req.cid   = in_req.cid;
-      out_req.uuid  = in_req.uuid;
-      // send memory request
-      ReqOut.at(i).push(out_req, delay_);
-      DT(4, this->name() << "-req" << i << ": " << out_req);
-    }
-  }
-  ReqIn.pop();
-}
-
-// ...
-```
-
-Similarly, we also want to do the same for the `LocalMemSwitch::tick()` function
-
-```cpp
-// ...
-
-// process incoming requests
-if (!ReqIn.empty()) {
-  auto& in_req = ReqIn.front();
-
-  LsuReq out_dc_req(in_req.mask.size());
-  out_dc_req.write = in_req.write;
-  out_dc_req.tag   = in_req.tag;
-  out_dc_req.cid   = in_req.cid;
-  out_dc_req.uuid  = in_req.uuid;
-
-  out_dc_req.is_prefetch = in_req.is_prefetch; // ADD
-
-  LsuReq out_lmem_req(out_dc_req);
-    
-// ...
-```
-
-#### 1d: Editing `mem_coalescer.cpp`
-
-In the `MemCoalescer::tick()` function, we also need to propagate through the memory coalescer to ensure the flag is set throughout our structures
-
-```cpp
-// ...
-
-// build memory request
-LsuReq out_req{output_size_};
-out_req.mask = out_mask;
-out_req.tag = tag;
-out_req.write = in_req.write;
-out_req.addrs = out_addrs;
-out_req.cid = in_req.cid;
-out_req.uuid = in_req.uuid;
-  
-out_req.is_prefetch = in_req.is_prefetch; // ADD
-
-// ...
-```
-
-### Step 2: Adding Counters
-
-We want to add all three prefetch counters into the `PerfStats` structure (in the `/sim/simx/cache_sim.h` file)
-
-```cpp
-struct PerfStats {
-    uint64_t reads;
-    uint64_t writes;
-    uint64_t read_misses;
-    uint64_t write_misses;
-    uint64_t evictions;
-    uint64_t bank_stalls;
-    uint64_t mshr_stalls;
-    uint64_t mem_latency;
-    
-    uint64_t prefetch_requests;  // ADD
-    uint64_t prefetch_unused;    // ADD
-    uint64_t prefetch_late;      // ADD
-
-    PerfStats()
-        : reads(0)
-        , writes(0)
-        , read_misses(0)
-        , write_misses(0)
-        , evictions(0)
-        , bank_stalls(0)
-        , mshr_stalls(0)
-        , mem_latency(0)
-        , prefetch_requests(0)   // ADD
-        , prefetch_unused(0)     // ADD
-        , prefetch_late(0)       // ADD
-    {}
-
-    PerfStats& operator+=(const PerfStats& rhs) {
-        this->reads += rhs.reads;
-        this->writes += rhs.writes;
-        this->read_misses += rhs.read_misses;
-        this->write_misses += rhs.write_misses;
-        this->evictions += rhs.evictions;
-        this->bank_stalls += rhs.bank_stalls;
-        this->mshr_stalls += rhs.mshr_stalls;
-        this->mem_latency += rhs.mem_latency;
-        this->prefetch_requests += rhs.prefetch_requests;  // ADD
-        this->prefetch_unused += rhs.prefetch_unused;      // ADD
-        this->prefetch_late += rhs.prefetch_late;          // ADD
-        return *this;
-    }
-};
-```
-
-To implement functionality, we add counter logic in the `processRequests()` function (in the `/sim/simx/cache_sim.cpp` file)
-
-```cpp
-void processRequests() {
-	    
-    //...
-
-    case bank_req_t::Core: {
-        int32_t free_line_id = -1;
-        int32_t repl_line_id = 0;
-        auto& set = sets_.at(bank_req.set_id);
-		
-        // tag lookup
-        int hit_line_id = set.tag_lookup(bank_req.addr_tag, &free_line_id, &repl_line_id);
-		
-        if (hit_line_id != -1) {
-            // Hit handling
-            auto& hit_line = set.lines.at(hit_line_id);
-		
-            // ADD: Mark as used if it was prefetched
-            if (hit_line.was_prefetched && bank_req.is_prefetch) {
-                hit_line.was_used = true;
-            }
-			
-            if (bank_req.write) {
-                // handle write hit
-                if (!config_.write_back) {
-                    MemReq mem_req;
-                    mem_req.addr  = params_.mem_addr(bank_id_, bank_req.set_id, bank_req.addr_tag);
-                    mem_req.write = true;
-                    mem_req.cid   = bank_req.cid;
-                    mem_req.uuid  = bank_req.uuid;
-                    this->mem_req_port.push(mem_req);
-                    DT(3, this->name() << "-writethrough: " << mem_req);
-                } else {
-                    hit_line.dirty = true;
-                }
-            }
-			
-            // CHANGE: send core response (not for prefetch)
-            if (!bank_req.is_prefetch && (!bank_req.write || config_.write_reponse)) {
-                MemRsp core_rsp{bank_req.req_tag, bank_req.cid, bank_req.uuid};
-                this->core_rsp_port.push(core_rsp);
-                DT(3, this->name() << "-core-rsp: " << core_rsp);
-            }
-            --pending_mshr_size_;
-        } else {
-            // Miss handling
-            if (bank_req.write && !bank_req.is_prefetch) {
-                ++perf_stats_.write_misses;
-            } else if (!bank_req.is_prefetch) {
-                ++perf_stats_.read_misses;
-            }
-		
-            // ADD: Counter 1 - Count unique prefetch requests that miss
-            if (bank_req.is_prefetch) {
-                ++perf_stats_.prefetch_requests;
-            }
-
-            // ADD: Check if there's already a pending MSHR for this address
-            auto mshr_pending = mshr_.lookup(bank_req);
-		
-            // ADD: Counter 3 - Late prefetch (demand arrives while prefetch in MSHR)
-            if (!bank_req.is_prefetch && mshr_pending) {
-                ++perf_stats_.prefetch_late;
-            }
-
-            if (free_line_id == -1 && config_.write_back) {
-                // write back dirty line
-                auto& repl_line = set.lines.at(repl_line_id);
-			
-                // ADD: Counter 2 - Unused prefetch (evicting prefetched but unused line)
-                if (repl_line.was_prefetched && !repl_line.was_used) {
-                    ++perf_stats_.prefetch_unused;
-                }
-			
-                if (repl_line.dirty) {
-                    MemReq mem_req;
-                    mem_req.addr  = params_.mem_addr(bank_id_, bank_req.set_id, repl_line.tag);
-                    mem_req.write = true;
-                    mem_req.cid   = bank_req.cid;
-                    this->mem_req_port.push(mem_req);
-                    DT(3, this->name() << "-writeback: " << mem_req);
-                    ++perf_stats_.evictions;
-                }
-            }
-
-            if (bank_req.write && !config_.write_back) {
-                // forward write request to memory
-
-                {
-                    MemReq mem_req;
-                    mem_req.addr  = params_.mem_addr(bank_id_, bank_req.set_id, bank_req.addr_tag);
-                    mem_req.write = true;
-                    mem_req.cid   = bank_req.cid;
-                    mem_req.uuid  = bank_req.uuid;
-                    this->mem_req_port.push(mem_req);
-                    DT(3, this->name() << "-writethrough: " << mem_req);
-                }
-                // CHANGE: send core response
-                if (config_.write_reponse && !bank_req.is_prefetch) {
-                    MemRsp core_rsp{bank_req.req_tag, bank_req.cid, bank_req.uuid};
-                    this->core_rsp_port.push(core_rsp);
-                    DT(3, this->name() << "-core-rsp: " << core_rsp);
-                }
-                --pending_mshr_size_;
-            } else {
-	            // MSHR lookup
-				auto mshr_pending = mshr_.lookup(bank_req);
-	            
-                // allocate MSHR
-                auto mshr_id = mshr_.enqueue(bank_req, (free_line_id != -1) ? free_line_id : repl_line_id);
-                DT(3, this->name() << "-mshr-enqueue: " << bank_req);
-
-                // send fill request
-                if (!mshr_pending) {
-                    MemReq mem_req;
-                    mem_req.addr  = params_.mem_addr(bank_id_, bank_req.set_id, bank_req.addr_tag);
-                    mem_req.write = false;
-                    mem_req.tag   = mshr_id;
-                    mem_req.cid   = bank_req.cid;
-                    mem_req.uuid  = bank_req.uuid;
-                    mem_req.is_prefetch = bank_req.is_prefetch;  // ADD
-                    this->mem_req_port.push(mem_req);
-                    DT(3, this->name() << "-fill-req: " << mem_req);
-                    ++pending_fill_reqs_;
-                }
-            }
-        }
-    } break;
-    
-    // ...
-}
-```
-
-### Step 3: Printing Results
-
-#### 3a: Editing `VX_types.vh`
-
-In order to print the results, we first need to add three new CSR definitions into `VX_types.vh` (in the `/hw/rtl/` directory)
-
-**Note:** Despite this assignment focusing on SimX (C++), we are editing a `*.vh` file. This file creates a `VX_types.h` file that's in the `/build/hw/` directory (after making the build)
+Create `hw/rtl/core/VX_alu_dot8.sv` (files in `hw/rtl/core` are picked up
+automatically). It has the interface of the other ALU sub-units and uses
+[`VX_pe_serializer`](https://github.com/vortexgpgpu/vortex/blob/v3.0/hw/rtl/libs/VX_pe_serializer.sv)
+for the valid/ready handshake, the lane-to-PE mapping and the pipelining of the
+instruction header (see its use in
+[`VX_fpu_dsp.sv`](https://github.com/vortexgpgpu/vortex/blob/v3.0/hw/rtl/fpu/VX_fpu_dsp.sv#L148)):
 
 ```verilog
-`define VX_CSR_MPM_PREFETCH_REQ     12'hB15     // unique prefetch requests
-`define VX_CSR_MPM_PREFETCH_REQ_H   12'hB95
-`define VX_CSR_MPM_PREFETCH_UNUSED  12'hB16     // unused prefetches
-`define VX_CSR_MPM_PREFETCH_UNUSED_H 12'hB96
-`define VX_CSR_MPM_PREFETCH_LATE    12'hB17     // late prefetches
-`define VX_CSR_MPM_PREFETCH_LATE_H  12'hB97
+`include "VX_define.vh"
+
+module VX_alu_dot8 import VX_gpu_pkg::*; #(
+    parameter `STRING INSTANCE_ID = "",
+    parameter NUM_LANES = 1
+) (
+    input wire          clk,
+    input wire          reset,
+    VX_execute_if.slave execute_if,   // data_t = alu_execute_t
+    VX_result_if.master result_if     // data_t = alu_result_t
+);
+    `UNUSED_SPARAM (INSTANCE_ID)
+    `UNUSED_VAR (execute_if.data.op_type)
+    `UNUSED_VAR (execute_if.data.op_args)
+    `UNUSED_VAR (execute_if.data.rs3_data)
+
+    localparam TAG_WIDTH    = $bits(alu_header_t);
+    localparam LATENCY_DOT8 = `VX_CFG_DOT8_LATENCY;
+    localparam NUM_PES      = NUM_LANES;
+
+    wire pe_enable;
+    wire [NUM_LANES-1:0][2*`VX_CFG_XLEN-1:0] data_in;
+    wire [NUM_PES-1:0][2*`VX_CFG_XLEN-1:0] pe_data_in;
+    wire [NUM_PES-1:0][`VX_CFG_XLEN-1:0] pe_data_out;
+
+    // data_in[i] = {rs2_data[i], rs1_data[i]}
+
+    VX_pe_serializer #(
+        .NUM_LANES      (NUM_LANES),
+        .NUM_PES        (NUM_PES),
+        .LATENCY        (LATENCY_DOT8),
+        .DATA_IN_WIDTH  (2 * `VX_CFG_XLEN),
+        .DATA_OUT_WIDTH (`VX_CFG_XLEN),
+        .TAG_WIDTH      (TAG_WIDTH),
+        .PE_REG         (1),
+        .OUT_BUF        (0)
+    ) pe_serializer (
+        .clk         (clk),
+        .reset       (reset),
+        .valid_in    (execute_if.valid),
+        .mask_in     (execute_if.data.header.tmask),
+        .data_in     (data_in),
+        .shared_in   (1'b0),
+        .tag_in      (execute_if.data.header),
+        .ready_in    (execute_if.ready),
+        .pe_enable   (pe_enable),
+        `UNUSED_PIN  (pe_mask_out),
+        .pe_data_out (pe_data_in),
+        `UNUSED_PIN  (pe_shared_out),
+        .pe_data_in  (pe_data_out),
+        .valid_out   (result_if.valid),
+        `UNUSED_PIN  (mask_out),
+        .data_out    (result_if.data.data),
+        .tag_out     (result_if.data.header),
+        .ready_out   (result_if.ready)
+    );
+
+    for (genvar i = 0; i < NUM_PES; ++i) begin : g_PEs
+        // TODO: split pe_data_in[i] into a (rs1) and b (rs2), compute
+        //       c = sum of the four signed int8 products (32-bit),
+        //       delay it by LATENCY_DOT8 stages with
+        //       `BUFFER_EX(result, c, pe_enable, 0, LATENCY_DOT8);
+        //       and drive pe_data_out[i] (sign-extended to XLEN).
+    end
+endmodule
 ```
 
-**IMPORTANT:** Because class 2 counters are full, we cannot add these counters within that class, adding these counters into that class will result in errors!. Thus we are adding the counters in class 3.
+Things to know:
 
-#### 3b: Editing `utils.cpp`
+- The whole instruction header (`alu_header_t`: uuid, warp, thread mask, PC,
+  `rd`, ...) is the serializer's tag; the result interface carries
+  `{header, data}`. These types come from the `DECL_EXECUTE_T` macro in
+  `VX_define.vh`; do not redeclare them.
+- Products must be signed: `$signed(a[7:0]) * $signed(b[7:0])`.
+- `OUT_BUF` stays 0 so the unit is exactly `PE_REG + LATENCY` = 1 +
+  `VX_CFG_DOT8_LATENCY` register stages, i.e. `VX_CFG_DOT8_LATENCY` stages
+  more than the integer ALU's single stage, which is what SimX's
+  `latency_of() = VX_CFG_DOT8_LATENCY` models. An extra output buffer would
+  break cycle parity.
 
-To have `PERF: …` line at the end of the test, we need to add output logic within the `dcache_enable` if statement (in the `/runtime/stub/utils.cpp` file) with our newly added counters in the 
+### Step B3: Hook it into the ALU
 
-```cpp
-// ...
+`VX_alu_unit.sv` is a `VX_pe_switch` over its processing elements (integer
+ALU, mul/div) with a `pe_select` mux on `op_args.alu.xtype`:
 
-// PERF: Prefetch counters in class 3
-uint64_t prefetch_requests;
-CHECK_ERR(vx_mpm_query(hdevice, VX_CSR_MPM_PREFETCH_REQ, core_id, &prefetch_requests), {
-return err;
-});
-uint64_t prefetch_unused;
-CHECK_ERR(vx_mpm_query(hdevice, VX_CSR_MPM_PREFETCH_UNUSED, core_id, &prefetch_unused), {
-return err;
-});
-uint64_t prefetch_late;
-CHECK_ERR(vx_mpm_query(hdevice, VX_CSR_MPM_PREFETCH_LATE, core_id, &prefetch_late), {
-return err;
-});
-fprintf(stream, "PERF: core%d: dcache prefetch requests=%lu\n", core_id, prefetch_requests);
-fprintf(stream, "PERF: core%d: dcache prefetch unused=%lu\n", core_id, prefetch_unused);
-fprintf(stream, "PERF: core%d: dcache prefetch late=%lu\n", core_id, prefetch_late);
+1. `PE_COUNT = 1 + VX_CFG_EXT_M_ENABLED + 1` and
+   `localparam PE_IDX_DOT8 = PE_IDX_MDV + 1;`
+   ([L34](https://github.com/vortexgpgpu/vortex/blob/v3.0/hw/rtl/core/VX_alu_unit.sv#L34)).
+2. In the `pe_select` block ([L70](https://github.com/vortexgpgpu/vortex/blob/v3.0/hw/rtl/core/VX_alu_unit.sv#L70)),
+   select `PE_IDX_DOT8` when `xtype == ALU_TYPE_ARITH` and
+   `op_type == INST_OP_BITS'(INST_ALU_DOT8)`. The integer ALU never sees DOT8.
+3. After the mul/div instance ([L111](https://github.com/vortexgpgpu/vortex/blob/v3.0/hw/rtl/core/VX_alu_unit.sv#L111)),
+   instantiate `VX_alu_dot8` on `pe_execute_if[PE_IDX_DOT8]` /
+   `pe_result_if[PE_IDX_DOT8]`, with
+   `.INSTANCE_ID (`` `SFORMATF(("%s-dot8%0d", INSTANCE_ID, block_idx)) ``)` and
+   `.NUM_LANES (NUM_LANES)`.
 
-// ...
-```
-
-#### 3c: Editing `emulator.cpp`
-
-Because our addresses are extended outside of the CSR address range, we need to expand it from 32 to 64 bits in the `user-defined MPM CSRs` section (in the `/sim/simx/emulator.cpp` directory)
-
-```cpp
-// ...
-
-if ((addr >= VX_CSR_MPM_BASE && addr < (VX_CSR_MPM_BASE + 64)) // CHANGE
- || (addr >= VX_CSR_MPM_BASE_H && addr < (VX_CSR_MPM_BASE_H + 64)))
- 
-// ...
-```
-
-Also, we need to add the logic to expose these counters in the CSR in the class 3 case of the performance counters along with the logic to read and expose them:
-
-```cpp
-// ...
-case VX_DCR_MPM_CLASS_3: {
-  // Add your custom counters here for Class 3:
-  auto socket_perf = core_->socket()->perf_stats();
-          // Add your custom counters here for Class 3:
-          switch (addr) {
-          CSR_READ_64(VX_CSR_MPM_PREFETCH_REQ, socket_perf.dcache.prefetch_requests);
-          CSR_READ_64(VX_CSR_MPM_PREFETCH_UNUSED, socket_perf.dcache.prefetch_unused);
-          CSR_READ_64(VX_CSR_MPM_PREFETCH_LATE, socket_perf.dcache.prefetch_late);
-          }
-}
-// ...
-```
-
-
-
-#### 3d: Editing `vortex.cpp`
-
-Similarly, we need to edit the `mpm_query()` function to support an extended address range (in the `/runtime/simx/vortex.cpp` file)
-
-```cpp
-// ...
-
-int mpm_query(uint32_t addr, uint32_t core_id, uint64_t *value) {
-  uint32_t offset = addr - VX_CSR_MPM_BASE;
-  if (offset > 63)  // CHANGE 1
-    return -1;
-  if (mpm_cache_.count(core_id) == 0) {
-    uint64_t mpm_mem_addr = IO_MPM_ADDR + core_id * 64 * sizeof(uint64_t);  // CHANGE 2
-    CHECK_ERR(this->download(mpm_cache_[core_id].data(), mpm_mem_addr, 64 * sizeof(uint64_t)), {  // CHANGE 3
-      return err;
-    });
-  }
-  *value = mpm_cache_.at(core_id).at(offset);
-  return 0;
-}
-
-// ...
-```
-
-## Verification and Testing:
-
-To test your changes, you can run the following to build and verify prefetch functionality
+### Step B4: Build and cross-check
 
 ```bash
-# Make the build
+../configure --xlen=32 --tooldir=$HOME/tools
 make -s
-
-# Test with SimX
-./ci/blackbox.sh --driver=simx --cores=1 --app=prefetch --perf=3
+./ci/blackbox.sh --driver=rtlsim --cores=4 --warps=4 --threads=4 --app=demo          # sanity
+./ci/blackbox.sh --driver=rtlsim --cores=4 --warps=4 --threads=4 --app=dot8 --args="-n64"
+./ci/blackbox.sh --driver=rtlsim --cores=4 --warps=4 --threads=4 --app=dot8 --args="-n64 -b"
 ```
 
-The expected result is a test passed message and an output of all 3 metric counters, feel free to change `kernel.cpp` with different instruction/data sizes to observe prefetch efficiency
+Every (warps, threads) shape is a new Verilator build, 3.5–7 minutes on a
+lightly loaded machine; each `-n64` run then takes 7–14 s. Use `-n64` on
+rtlsim (the `-n128` baseline exceeds two minutes). Run the same sizes on SimX
+and compare:
+
+- `instrs=` must match SimX **exactly** for both kernels and every shape;
+- `cycles=` should agree within about 1%.
+
+## Part C (optional): ASIC synthesis of your DOT8 unit
+
+v3.0 ships an open-source ASIC flow in `hw/syn/yosys` (sv2v → Yosys/ABC →
+OpenSTA, ASAP7 7.5-track RVT library, 800 MHz default target) with a per-DUT
+dispatcher, `hw/syn/yosys/dut`. A module with interface ports cannot be a
+synthesis top, so every DUT has a thin wrapper with plain ports
+(`hw/unittest/*/VX_*_top.sv`). Apply the wrapper for your unit and its catalog
+entry (4 lanes, 4 warps):
+
+```bash
+cd vortex
+git apply ~/vortex_tutorials/Exercises/patches/a3_synth_wrapper.patch
+cd build32 && ../configure --xlen=32 --tooldir=$HOME/tools
+```
+
+Synthesize at three latencies. Use a new `PREFIX` for every parameter change:
+the flow caches its generated sources per `PREFIX` and does not regenerate
+them. The first run installs the ASAP7 library files (about a minute, needs
+network); each run then takes about 2 minutes.
+
+```bash
+make -C hw/syn/yosys/dut dot8                                                   # latency 2
+make -C hw/syn/yosys/dut dot8 PREFIX=dot8_l1 CONFIGS=-DVX_CFG_DOT8_LATENCY=1
+make -C hw/syn/yosys/dut dot8 PREFIX=dot8_l3 CONFIGS=-DVX_CFG_DOT8_LATENCY=3
+cat hw/syn/yosys/dot8*_VX_alu_dot8_top/synth_summary.csv
+less hw/syn/yosys/dot8_VX_alu_dot8_top/reports/stat_lib.rpt    # per-cell area
+less hw/syn/yosys/dot8_VX_alu_dot8_top/reports/setup.rpt       # critical path
+```
+
+Then make the latency count: restructure the PE as two stages (four products
+registered in stage 1, the adder tree in stage 2, the remaining
+`LATENCY_DOT8 - 2` stages as a plain delay) and re-synthesize. SimX does not
+change: the latency is the same.
+
+## Expected results
+
+**SimX, N=128, 4 cores, `VX_CFG_DOT8_LATENCY=2`:**
+
+| warps × threads | baseline instrs | DOT8 instrs | instr ratio | baseline cycles | DOT8 cycles | speedup |
+|---|---:|---:|---:|---:|---:|---:|
+| 4 × 4 | 4,341,824 | 2,781,248 | 1.56× | 2,793,392 | 1,655,931 | **1.69×** |
+| 4 × 8 | 2,170,944 | 1,390,656 | 1.56× | 1,406,099 | 836,358   | **1.68×** |
+| 8 × 4 | 4,341,888 | 2,781,312 | 1.56× | 1,843,162 | 1,179,654 | **1.56×** |
+| 8 × 8 | 2,171,008 | 1,390,720 | 1.56× | 926,782   | 591,636   | **1.57×** |
+
+**SimX vs rtlsim, N=64, 4 cores** (instructions identical on both drivers):
+
+| warps × threads | kernel | instrs | SimX cycles | rtlsim cycles | delta |
+|---|---|---:|---:|---:|---:|
+| 4 × 4 | baseline | 561,216 | 353,125 | 353,218 | +0.03% |
+| 4 × 4 | DOT8     | 367,680 | 218,470 | 218,612 | +0.06% |
+| 4 × 8 | baseline | 280,640 | 177,967 | 178,290 | +0.18% |
+| 4 × 8 | DOT8     | 183,872 | 109,781 | 109,792 | +0.01% |
+| 8 × 4 | baseline | 561,280 | 238,981 | 238,809 | −0.07% |
+| 8 × 4 | DOT8     | 367,744 | 156,123 | 156,410 | +0.18% |
+| 8 × 8 | baseline | 280,704 | 121,353 | 122,341 | +0.81% |
+| 8 × 8 | DOT8     | 183,936 | 79,187  | 80,097  | +1.15% |
+
+![DOT8 vs baseline instructions and cycles (SimX, N=128), and rtlsim-vs-SimX cycle delta (N=64)](expected/a3/dot8_speedup.png)
+
+**Part C, Yosys + OpenSTA, `VX_alu_dot8_top`, 4 lanes, ASAP7 RVT, 800 MHz target:**
+
+| `VX_CFG_DOT8_LATENCY` | cells | flops | cell area (µm²) | sequential area (µm²) | WNS (ns) | Fmax (MHz) | power (mW, vectorless) |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 9,282  | 496 | 971.0  | 144.6 | +0.377 | 1145 | 19.4 |
+| 2 | 9,889  | 680 | 1070.4 | 198.3 | +0.372 | 1139 | 19.8 |
+| 3 | 10,501 | 864 | 1148.7 | 251.9 | +0.374 | 1141 | 18.7 |
+
+![DOT8 cell area and Fmax vs latency](expected/a3/dot8_synthesis.png)
+
+Each extra stage adds 184 flops (4 lanes × 32-bit result, plus the instruction
+header tag and valid bit) and 78–99 µm² of cell area (about 54 µm² of it
+sequential), and **Fmax does not move** (1139–1145 MHz): the critical path
+(0.84 ns data arrival) is the whole combinational dot product, 8-bit
+multiplier into the adder tree into the result register, because `BUFFER_EX`
+only delays the result. About 80% of the cell area is combinational
+(872 of 1070 µm² at latency 2), essentially the four 8×8 multipliers and the
+adder tree per lane.
+
+Data: [`expected/a3/dot8_results.csv`](expected/a3/dot8_results.csv),
+[`expected/a3/dot8_synthesis.csv`](expected/a3/dot8_synthesis.csv).
+Reproduce: the sweep loop of Step A4 (SimX, `-n128`), the same loop with
+`--driver=rtlsim` and `-n64` for both drivers (Part B), and the three `make`
+commands of Part C.
+
+## Questions
+
+1. DOT8 does four multiply-adds per instruction, yet the kernel retires only
+   1.56× fewer instructions. Count the instructions of the inner loop in both
+   kernels from `kernel.dump`. Where do the DOT8 kernel's instructions go?
+2. Transpose B on the host so that one 32-bit load fetches four B bytes. How
+   many instructions does the inner loop need now, and what speedup do you
+   expect? Measure it.
+3. Why is the cycle speedup higher than the instruction ratio at 4 warps
+   (1.69× vs 1.56×) but equal to it at 8 warps?
+4. Why do SimX and rtlsim cycles differ when the instructions are identical,
+   and why is the gap larger at 8 warps × 8 threads?
+5. `VX_CFG_DOT8_LATENCY` goes from 1 to 3 and Fmax stays at ~1140 MHz. Why?
+   What does your two-stage version (Part C) do to the critical path, the flop
+   count and the area?
+6. Compare the area of one DOT8 lane with the integer ALU lane. At how many
+   lanes would you rather time-multiplex fewer DOT8 PEs over the lanes
+   (`PE_RATIO > 1` in `VX_pe_serializer`), and what does that cost in cycles?

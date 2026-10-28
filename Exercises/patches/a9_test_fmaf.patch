@@ -1,0 +1,71 @@
+diff --git a/examples/test_fmaf/test_fmaf.cu b/examples/test_fmaf/test_fmaf.cu
+new file mode 100644
+index 0000000..71c4649
+--- /dev/null
++++ b/examples/test_fmaf/test_fmaf.cu
+@@ -0,0 +1,57 @@
++// fmaf() on CuPBoP/Vortex: out[i] = fmaf(a[i], b[i], c[i]), checked bit-exact against the host fmaf.
++#include <cuda_runtime.h>
++#include <math.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++
++__global__ void fma_kernel(const float *a, const float *b, const float *c, float *out, int n) {
++  int i = blockIdx.x * blockDim.x + threadIdx.x;
++  if (i < n)
++    out[i] = fmaf(a[i], b[i], c[i]);
++}
++
++int main() {
++  const int n = 1024, block = 256;
++  size_t bytes = n * sizeof(float);
++  float *a = (float *)malloc(bytes), *b = (float *)malloc(bytes), *c = (float *)malloc(bytes), *out = (float *)malloc(bytes);
++  srand(1);
++  for (int i = 0; i < n; ++i) {
++    a[i] = rand() / (float)RAND_MAX * 4.0f - 2.0f;
++    b[i] = rand() / (float)RAND_MAX * 4.0f - 2.0f;
++    c[i] = rand() / (float)RAND_MAX * 4.0f - 2.0f;
++  }
++  // Single-rounding probe: (1+2^-12)^2 - (1+2^-11) = 2^-24 exactly with a fused multiply-add,
++  // but 0 when a*b is rounded to float first.
++  a[0] = b[0] = 1.0f + ldexpf(1.0f, -12);
++  c[0] = -(1.0f + ldexpf(1.0f, -11));
++
++  float *d_a, *d_b, *d_c, *d_out;
++  cudaMalloc((void **)&d_a, bytes);
++  cudaMalloc((void **)&d_b, bytes);
++  cudaMalloc((void **)&d_c, bytes);
++  cudaMalloc((void **)&d_out, bytes);
++  cudaMemcpy(d_a, a, bytes, cudaMemcpyHostToDevice);
++  cudaMemcpy(d_b, b, bytes, cudaMemcpyHostToDevice);
++  cudaMemcpy(d_c, c, bytes, cudaMemcpyHostToDevice);
++  fma_kernel<<<(n + block - 1) / block, block>>>(d_a, d_b, d_c, d_out, n);
++  cudaDeviceSynchronize();
++  cudaMemcpy(out, d_out, bytes, cudaMemcpyDeviceToHost);
++
++  int errors = 0;
++  for (int i = 0; i < n; ++i) {
++    float ref = fmaf(a[i], b[i], c[i]);
++    if (memcmp(&ref, &out[i], sizeof(float)) != 0) {
++      if (errors < 10)
++        printf("mismatch at %d: fmaf(%a, %a, %a) = %a, expected %a\n", i, a[i], b[i], c[i], out[i], ref);
++      ++errors;
++    }
++  }
++  printf("probe: fmaf((1+2^-12)^2, -(1+2^-11)) = %a (expected 0x1p-24)\n", out[0]);
++  if (errors) {
++    printf("FAILED! %d of %d mismatches\n", errors, n);
++    return 1;
++  }
++  printf("PASSED!\n");
++  return 0;
++}
+diff --git a/examples/test_fmaf/Makefile b/examples/test_fmaf/Makefile
+new file mode 100644
+index 0000000..39b8868
+--- /dev/null
++++ b/examples/test_fmaf/Makefile
+@@ -0,0 +1,2 @@
++KERNEL_CU = test_fmaf.cu
++include ../common.mk

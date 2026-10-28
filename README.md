@@ -6,17 +6,9 @@ You can also find more information about Vortex on our [homepage](https://vortex
 
 ## Tutorial Assignments
 
-Provided are seven hands-on tutorial assignments covering various aspects of Vortex:
-
-[Assignment 1](Exercises/assignment1.md) and [Assignment 2](Exercises/assignment2.md) add a warp efficiency performance counter in Vortex's cycle-level simulator and RTL respectively.
-
-[Assignment 3](Exercises/assignment3.md) and [Assignment 4](Exercises/assignment4.md) add software prefetching to the cycle-level simulator and RTL respectively.
-
-[Assignment 5](Exercises/assignment5.md) and [Assignment 6](Exercises/assignment6.md) add a new custom RISC-V instruction for computing the integer dot product in the cycle-level simulator and RTL respectively.
-
-[Assignment 7](Exercises/assignment7.md) teaches how to debug Vortex.
-
-[Assignment 8](Exercises/assignment8.md) and [Assignment 9](Exercises/assignment9.md) add support for a new input matrix format: TF32 (Tensor Float 32) with focus on FMA operations and implementation for the same in SIMX and RTL respectively.
+Twelve hands-on assignments for Vortex v3.0, grouped into microarchitecture, debug and
+performance tools, programming models, and accelerators and graphics. See the
+[exercise index](Exercises/README.md).
 
 ## Getting Vortex
 

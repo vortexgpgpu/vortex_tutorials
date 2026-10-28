@@ -1,0 +1,269 @@
+diff --git a/tests/regression/Makefile b/tests/regression/Makefile
+--- a/tests/regression/Makefile
++++ b/tests/regression/Makefile
+@@ -14,7 +14,7 @@ TESTS := \
+     sgemm2_dxa_mcast sgemm_tcu_wg_dxa_mcast                           \
+     dxa_copy dxa_copy_mcast dxa_kmajor_check                          \
+     async_barrier async_gbarrier gbar_phase bar_slot_phase packld wgather wsync quad_lod \
+-    occupancy multikernel reopen module_reload single_cta            \
++    occupancy multikernel reopen module_reload single_cta dot8       \
+     vm_test vm_fault vm_stress
+ 
+ # --- common exclude list ---------------------------------------------
+diff --git a/tests/regression/dot8/Makefile b/tests/regression/dot8/Makefile
+new file mode 100644
+--- /dev/null
++++ b/tests/regression/dot8/Makefile
+@@ -0,0 +1,14 @@
++ROOT_DIR := $(realpath ../../..)
++include $(ROOT_DIR)/config.mk
++
++PROJECT := dot8
++
++SRC_DIR := $(VORTEX_HOME)/tests/regression/$(PROJECT)
++
++SRCS := $(SRC_DIR)/main.cpp
++
++VX_SRCS := $(SRC_DIR)/kernel.cpp
++
++KERNEL_LIB := vortex2
++
++include ../common.mk
+diff --git a/tests/regression/dot8/common.h b/tests/regression/dot8/common.h
+new file mode 100644
+--- /dev/null
++++ b/tests/regression/dot8/common.h
+@@ -0,0 +1,16 @@
++#ifndef _COMMON_H_
++#define _COMMON_H_
++
++#include <stdint.h>
++
++typedef int8_t  TYPE_IN;
++typedef int32_t TYPE_OUT;
++
++typedef struct {
++  uint32_t size;
++  uint64_t A_addr;
++  uint64_t B_addr;
++  uint64_t C_addr;
++} kernel_arg_t;
++
++#endif
+diff --git a/tests/regression/dot8/kernel.cpp b/tests/regression/dot8/kernel.cpp
+new file mode 100644
+--- /dev/null
++++ b/tests/regression/dot8/kernel.cpp
+@@ -0,0 +1,41 @@
++#include <vx_spawn2.h>
++#include "common.h"
++
++// Accelerated kernel: four int8 products per VX_DOT8 instruction.
++__kernel void kernel_main(kernel_arg_t* __UNIFORM__ arg) {
++    auto A = reinterpret_cast<TYPE_IN*>(arg->A_addr);
++    auto B = reinterpret_cast<TYPE_IN*>(arg->B_addr);
++    auto C = reinterpret_cast<TYPE_OUT*>(arg->C_addr);
++    auto size = arg->size;
++
++    int col = blockIdx.x * blockDim.x + threadIdx.x;
++    int row = blockIdx.y * blockDim.y + threadIdx.y;
++
++    TYPE_OUT sum = 0;
++    // TODO (assignment 3, Part A): for e = 0, 4, 8, ... < size
++    //   packedA = A[row][e..e+3], one 32-bit load (the A row is contiguous)
++    //   packedB = B[e..e+3][col], four byte loads; byte k of packedB is B[e+k][col]
++    //   sum    += vx_dot8(packedA, packedB)
++    (void)A;
++    (void)B;
++
++    C[row * size + col] = sum;
++}
++
++// Baseline kernel: scalar int8 multiply-accumulate.
++__kernel void kernel_base(kernel_arg_t* __UNIFORM__ arg) {
++    auto A = reinterpret_cast<TYPE_IN*>(arg->A_addr);
++    auto B = reinterpret_cast<TYPE_IN*>(arg->B_addr);
++    auto C = reinterpret_cast<TYPE_OUT*>(arg->C_addr);
++    auto size = arg->size;
++
++    int col = blockIdx.x * blockDim.x + threadIdx.x;
++    int row = blockIdx.y * blockDim.y + threadIdx.y;
++
++    TYPE_OUT sum = 0;
++    for (uint32_t e = 0; e < size; ++e) {
++        sum += (TYPE_OUT)A[row * size + e] * (TYPE_OUT)B[e * size + col];
++    }
++
++    C[row * size + col] = sum;
++}
+diff --git a/tests/regression/dot8/main.cpp b/tests/regression/dot8/main.cpp
+new file mode 100644
+--- /dev/null
++++ b/tests/regression/dot8/main.cpp
+@@ -0,0 +1,166 @@
++// Copyright © 2019-2023
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++// http://www.apache.org/licenses/LICENSE-2.0
++
++// dot8 — int8 matrix multiply using the VX_DOT8 custom instruction.
++//
++// Same host flow as sgemm. `-b` launches the scalar baseline kernel
++// (kernel_base) instead of the VX_DOT8 kernel (kernel_main).
++
++#include <vortex2.h>
++#include "common.h"
++
++#include <chrono>
++#include <cstdint>
++#include <cstdio>
++#include <cstdlib>
++#include <iostream>
++#include <unistd.h>
++#include <vector>
++
++#define CHECK(expr) do { \
++    vx_result_t _r = (expr); \
++    if (_r != VX_SUCCESS) { \
++        std::fprintf(stderr, "FAIL %s:%d: '%s' returned %s\n", \
++                     __FILE__, __LINE__, #expr, vx_result_string(_r)); \
++        std::exit(1); \
++    } \
++} while (0)
++
++namespace {
++const char* kernel_file = "kernel.vxbin";
++uint32_t    size        = 64;
++bool        baseline    = false;
++
++void parse_args(int argc, char** argv) {
++    int c;
++    while ((c = getopt(argc, argv, "n:k:bh")) != -1) {
++        switch (c) {
++            case 'n': size        = std::atoi(optarg); break;
++            case 'k': kernel_file = optarg;            break;
++            case 'b': baseline    = true;              break;
++            default:
++                std::cout << "Usage: [-k kernel] [-n size] [-b: baseline kernel] [-h]" << std::endl;
++                std::exit(c == 'h' ? 0 : -1);
++        }
++    }
++}
++
++void matmul_cpu(TYPE_OUT* out, const TYPE_IN* A, const TYPE_IN* B, uint32_t n) {
++    for (uint32_t r = 0; r < n; ++r)
++        for (uint32_t c = 0; c < n; ++c) {
++            TYPE_OUT s = 0;
++            for (uint32_t e = 0; e < n; ++e) s += (TYPE_OUT)A[r*n + e] * (TYPE_OUT)B[e*n + c];
++            out[r*n + c] = s;
++        }
++}
++} // namespace
++
++int main(int argc, char** argv) {
++    parse_args(argc, argv);
++    std::srand(50);
++
++    if (size % 4) {
++        std::cerr << "matrix size " << size << " must be a multiple of 4" << std::endl;
++        return -1;
++    }
++    const uint32_t size_sq  = size * size;
++    const uint64_t in_size  = size_sq * sizeof(TYPE_IN);
++    const uint64_t out_size = size_sq * sizeof(TYPE_OUT);
++    std::cout << "dot8 vortex2: " << size << "x" << size
++              << (baseline ? " (baseline int8 kernel)" : " (VX_DOT8 kernel)") << std::endl;
++
++    vx_device_h dev = nullptr;
++    CHECK(vx_device_open(0, &dev));
++
++    vx_queue_info_t qi = { sizeof(qi), nullptr, VX_QUEUE_PRIORITY_NORMAL, 0 };
++    vx_queue_h q = nullptr;
++    CHECK(vx_queue_create(dev, &qi, &q));
++
++    const uint32_t global_dim[2] = {size, size};
++    uint32_t grid[2], block[2];
++    CHECK(vx_device_max_occupancy_grid(dev, 2, global_dim, grid, block));
++    if ((size % block[0]) || (size % block[1])) {
++        std::cerr << "matrix size " << size << " must divide block "
++                  << block[0] << "x" << block[1] << std::endl;
++        return -1;
++    }
++
++    vx_buffer_h A_buf=nullptr, B_buf=nullptr, C_buf=nullptr;
++    CHECK(vx_buffer_create(dev, in_size,  VX_MEM_READ,  &A_buf));
++    CHECK(vx_buffer_create(dev, in_size,  VX_MEM_READ,  &B_buf));
++    CHECK(vx_buffer_create(dev, out_size, VX_MEM_WRITE, &C_buf));
++
++    vx_module_h mod = nullptr;
++    vx_kernel_h kern = nullptr;
++    CHECK(vx_module_load_file(dev, kernel_file, &mod));
++    CHECK(vx_module_get_kernel(mod, baseline ? "kernel_base" : "main", &kern));
++
++    kernel_arg_t kernel_arg{};
++    kernel_arg.size = size;
++    CHECK(vx_buffer_address(A_buf, &kernel_arg.A_addr));
++    CHECK(vx_buffer_address(B_buf, &kernel_arg.B_addr));
++    CHECK(vx_buffer_address(C_buf, &kernel_arg.C_addr));
++
++    std::vector<TYPE_IN> h_A(size_sq), h_B(size_sq);
++    std::vector<TYPE_OUT> h_C(size_sq);
++    for (uint32_t i = 0; i < size_sq; ++i) {
++        h_A[i] = static_cast<TYPE_IN>(std::rand());
++        h_B[i] = static_cast<TYPE_IN>(std::rand());
++    }
++
++    auto t0 = std::chrono::high_resolution_clock::now();
++
++    CHECK(vx_enqueue_write(q, A_buf, 0, h_A.data(), in_size, 0,nullptr,nullptr));
++    CHECK(vx_enqueue_write(q, B_buf, 0, h_B.data(), in_size, 0,nullptr,nullptr));
++
++    vx_launch_info_t li{};
++    li.struct_size = sizeof(li);
++    li.kernel      = kern;
++    li.args_host   = &kernel_arg;
++    li.args_size   = sizeof(kernel_arg);
++    li.ndim        = 2;
++    li.grid_dim[0] = grid[0];  li.grid_dim[1] = grid[1];
++    li.block_dim[0]= block[0]; li.block_dim[1]= block[1];
++
++    vx_event_h launch_ev=nullptr, read_ev=nullptr;
++    CHECK(vx_enqueue_launch(q, &li, 0, nullptr, &launch_ev));
++    CHECK(vx_enqueue_read(q, h_C.data(), C_buf, 0, out_size,
++                          1, &launch_ev, &read_ev));
++    CHECK(vx_event_wait_value(read_ev, 1, VX_TIMEOUT_INFINITE));
++    auto t1 = std::chrono::high_resolution_clock::now();
++    std::printf("Elapsed: %ld ms\n",
++        (long)std::chrono::duration_cast<std::chrono::milliseconds>(t1-t0).count());
++
++    int errors = 0;
++    std::vector<TYPE_OUT> h_ref(size_sq);
++    matmul_cpu(h_ref.data(), h_A.data(), h_B.data(), size);
++    for (uint32_t i = 0; i < size_sq; ++i) {
++        if (h_C[i] != h_ref[i]) {
++            if (errors < 16)
++                std::printf("*** [%u] expected=%d actual=%d\n", i, h_ref[i], h_C[i]);
++            ++errors;
++        }
++    }
++
++    vx_event_release(read_ev);
++    vx_event_release(launch_ev);
++    vx_buffer_release(C_buf);
++    vx_buffer_release(B_buf);
++    vx_buffer_release(A_buf);
++    vx_kernel_release(kern);
++    vx_module_release(mod);
++    vx_queue_release(q);
++    vx_device_dump_perf(dev, stdout);
++    vx_device_release(dev);
++
++    if (errors) {
++        std::cout << "Found " << errors << " errors!\nFAILED!" << std::endl;
++        return errors;
++    }
++    std::cout << "PASSED!" << std::endl;
++    return 0;
++}

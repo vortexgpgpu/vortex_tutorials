@@ -1,0 +1,13 @@
+app,driver,cores,scoreboard_stalls,alu_pct,fpu_pct,lsu_pct,sfu_pct,scrb_pct_of_cycles,cycles,instrs
+demo,simx,1,2158,34,0,65,0,33,6529,2444
+demo,rtlsim,1,1833,43,0,57,0,28,6511,2444
+vecadd,simx,1,422,38,22,39,1,33,1270,400
+vecadd,rtlsim,1,463,42,20,36,2,38,1216,400
+sgemm,simx,1,291525,11,79,10,0,36,802800,336912
+sgemm,rtlsim,1,297573,20,71,10,0,37,797014,336912
+demo,simx,4,105531,2,0,98,0,83,31878,9776
+demo,rtlsim,4,193966,1,0,99,0,99,49048,9776
+vecadd,simx,4,496,25,19,52,4,25,498,448
+vecadd,rtlsim,4,568,32,16,45,6,33,448,448
+sgemm,simx,4,331651,10,70,19,0,40,206224,336960
+sgemm,rtlsim,4,368374,25,59,15,0,45,204728,336960

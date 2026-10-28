@@ -1,0 +1,963 @@
+diff --git a/tests/hip/softmax/Makefile b/tests/hip/softmax/Makefile
+new file mode 100644
+index 0000000..e47e7f5
+--- /dev/null
++++ b/tests/hip/softmax/Makefile
+@@ -0,0 +1,25 @@
++ROOT_DIR := $(realpath ../../..)
++include $(ROOT_DIR)/config.mk
++
++PROJECT := softmax
++
++SRC_DIR := $(VORTEX_HOME)/tests/hip/$(PROJECT)
++
++SRCS := $(SRC_DIR)/main.cpp
++
++# Device kernel that main.cpp includes as <kernel.h> from the build directory.
++# Edit the copy in the source tree; KERNEL=<file> selects another file of this
++# directory.
++KERNEL ?= kernel.h
++
++common.h: $(SRC_DIR)/common.h
++	cp $< $@
++
++kernel.h: $(SRC_DIR)/$(KERNEL) FORCE
++	cmp -s $< $@ || cp $< $@
++
++$(PROJECT): kernel.h
++
++OPTS ?= -n64
++
++include ../common.mk
+diff --git a/tests/hip/softmax/common.h b/tests/hip/softmax/common.h
+new file mode 100644
+index 0000000..c02e62c
+--- /dev/null
++++ b/tests/hip/softmax/common.h
+@@ -0,0 +1,40 @@
++#ifndef COMMON_H
++#define COMMON_H
++
++#include <hip/hip_runtime.h>
++
++// Relative tolerance of the host check: exp() is not correctly rounded on the
++// device and the row sum accumulates rounding error over cols terms.
++#define REL_TOL 1e-4
++// Outputs this small are compared with an absolute tolerance of REL_TOL * ABS_FLOOR.
++#define ABS_FLOOR 1e-12
++
++// expf() for the Vortex device, built from arithmetic and bit operations only.
++//
++// chipStar lowers HIP math functions (expf, fmaxf, sqrtf, ...) to OpenCL
++// builtin calls in SPIR-V (_Z3expf, _Z4fmaxff, ...), and the PoCL-Vortex kernel
++// library in this release does not export those names, so a kernel that calls
++// one fails to link at JIT time ("Cannot find symbol _Z3expf in kernel
++// library"). This is the Cephes expf: round-to-nearest range reduction
++// x = n*ln2 + r, a degree-6 polynomial for exp(r), then a 2^n exponent scale.
++__device__ inline float softmax_expf(float x) {
++  if (x < -87.33654f)
++    return 0.0f;
++  if (x > 88.0f)
++    x = 88.0f;
++  float t = x * 1.44269504088896341f;
++  int n = (int)(t >= 0.0f ? t + 0.5f : t - 0.5f);
++  float fn = (float)n;
++  float r = x - fn * 0.693359375f;
++  r = r - fn * -2.12194440e-4f;
++  float p = 1.9875691500e-4f;
++  p = p * r + 1.3981999507e-3f;
++  p = p * r + 8.3334519073e-3f;
++  p = p * r + 4.1665795894e-2f;
++  p = p * r + 1.6666665459e-1f;
++  p = p * r + 5.0000001201e-1f;
++  float y = p * r * r + r + 1.0f;
++  return y * __builtin_bit_cast(float, (n + 127) << 23);
++}
++
++#endif // COMMON_H
+diff --git a/tests/hip/softmax/kernel.h b/tests/hip/softmax/kernel.h
+new file mode 100644
+index 0000000..98e963b
+--- /dev/null
++++ b/tests/hip/softmax/kernel.h
+@@ -0,0 +1,17 @@
++#pragma once
++
++// Row-wise softmax over a rows x cols row-major matrix.
++//   out[r][c] = exp(in[r][c] - max_r) / sum_c exp(in[r][c] - max_r)
++//
++// Launch: 1-D grid, one thread per row (the grid is rows rounded up to the
++// block size, so some threads have no row to process).
++// Use global memory only: __shared__ + __syncthreads() does not build for the
++// 32-bit Vortex device in this release.
++// Use softmax_expf() from common.h instead of expf(), and a comparison instead
++// of fmaxf(): HIP math functions do not link on Vortex in this release.
++__global__ void softmax(const float* in, float* out, unsigned rows, unsigned cols) {
++  // TODO: compute the row index of this thread and skip out-of-range rows.
++  // TODO: pass 1 - find the row maximum.
++  // TODO: pass 2 - write exp(x - max) to out and accumulate the row sum.
++  // TODO: pass 3 - divide each output element by the row sum.
++}
+diff --git a/tests/hip/softmax/main.cpp b/tests/hip/softmax/main.cpp
+new file mode 100644
+index 0000000..8036ebf
+--- /dev/null
++++ b/tests/hip/softmax/main.cpp
+@@ -0,0 +1,128 @@
++#include <hip/hip_runtime.h>
++
++#include <chrono>
++#include <cmath>
++#include <cstdint>
++#include <cstdio>
++#include <cstdlib>
++#include <unistd.h>
++#include <vector>
++
++#include "common.h"
++// Copied into the build directory from KERNEL (see Makefile).
++#include <kernel.h>
++
++#define HIP_CHECK(_expr)                                                  \
++  do {                                                                    \
++    hipError_t _err = (_expr);                                            \
++    if (_err != hipSuccess) {                                             \
++      fprintf(stderr, "HIP Error: '%s' returned %d (%s)\n",               \
++              #_expr, (int)_err, hipGetErrorString(_err));                \
++      exit(-1);                                                           \
++    }                                                                     \
++  } while (0)
++
++static void softmax_cpu(float* out, const float* in, uint32_t rows, uint32_t cols) {
++  for (uint32_t r = 0; r < rows; ++r) {
++    const float* x = in + r * cols;
++    double m = x[0];
++    for (uint32_t c = 1; c < cols; ++c)
++      m = std::fmax(m, (double)x[c]);
++    double sum = 0.0;
++    for (uint32_t c = 0; c < cols; ++c)
++      sum += std::exp((double)x[c] - m);
++    for (uint32_t c = 0; c < cols; ++c)
++      out[r * cols + c] = (float)(std::exp((double)x[c] - m) / sum);
++  }
++}
++
++static uint32_t size = 64;
++static float scale = 1.0f;
++
++static void show_usage() {
++  printf("Usage: [-n size (matrix is size x size)] [-s input scale] [-h: help]\n");
++}
++
++static void parse_args(int argc, char** argv) {
++  int c;
++  while ((c = getopt(argc, argv, "n:s:h")) != -1) {
++    switch (c) {
++    case 'n': size = atoi(optarg); break;
++    case 's': scale = atof(optarg); break;
++    case 'h': show_usage(); exit(0);
++    default:  show_usage(); exit(-1);
++    }
++  }
++  printf("Workload size=%ux%u, input range=[0, %g)\n", size, size, scale);
++}
++
++int main(int argc, char** argv) {
++  parse_args(argc, argv);
++
++  uint32_t rows = size;
++  uint32_t cols = size;
++  size_t nbytes = (size_t)rows * cols * sizeof(float);
++
++  std::vector<float> h_in(rows * cols), h_out(rows * cols), h_ref(rows * cols);
++  srand(50);
++  for (auto& v : h_in)
++    v = scale * (static_cast<float>(rand()) / static_cast<float>(RAND_MAX));
++
++  printf("Allocate device buffers\n");
++  float *d_in = nullptr, *d_out = nullptr;
++  HIP_CHECK(hipMalloc((void**)&d_in, nbytes));
++  HIP_CHECK(hipMalloc((void**)&d_out, nbytes));
++
++  printf("Upload source buffer\n");
++  HIP_CHECK(hipMemcpy(d_in, h_in.data(), nbytes, hipMemcpyHostToDevice));
++
++  // One thread per row; the block is as large as the device allows.
++  int dev_id = 0;
++  HIP_CHECK(hipGetDevice(&dev_id));
++  hipDeviceProp_t dev_props{};
++  HIP_CHECK(hipGetDeviceProperties(&dev_props, dev_id));
++  uint32_t block_size = (uint32_t)dev_props.maxThreadsPerBlock;
++  if (block_size > rows)
++    block_size = rows;
++  uint32_t grid_size = (rows + block_size - 1) / block_size;
++  printf("Execute the kernel: grid=%u, block=%u (device max=%d)\n",
++         grid_size, block_size, dev_props.maxThreadsPerBlock);
++
++  // The first launch JIT-compiles the SPIR-V module (chipStar -> PoCL).
++  auto t0 = std::chrono::high_resolution_clock::now();
++  softmax<<<dim3(grid_size), dim3(block_size), 0, 0>>>(d_in, d_out, rows, cols);
++  HIP_CHECK(hipGetLastError());
++  HIP_CHECK(hipDeviceSynchronize());
++  auto t1 = std::chrono::high_resolution_clock::now();
++  printf("Elapsed time (JIT + kernel): %lld ms\n",
++         (long long)std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count());
++
++  printf("Download destination buffer\n");
++  HIP_CHECK(hipMemcpy(h_out.data(), d_out, nbytes, hipMemcpyDeviceToHost));
++
++  printf("Verify result\n");
++  softmax_cpu(h_ref.data(), h_in.data(), rows, cols);
++  int errors = 0;
++  double max_rel = 0.0;
++  for (uint32_t i = 0; i < rows * cols; ++i) {
++    double rel = std::fabs((double)h_out[i] - h_ref[i]) / std::fmax((double)h_ref[i], ABS_FLOOR);
++    if (!(rel <= REL_TOL)) {
++      if (errors < 100)
++        printf("*** error: [%u][%u] expected=%g, actual=%g\n", i / cols, i % cols, h_ref[i], h_out[i]);
++      ++errors;
++    }
++    if (rel > max_rel)
++      max_rel = rel;
++  }
++  printf("Max relative error: %.3g\n", max_rel);
++
++  HIP_CHECK(hipFree(d_in));
++  HIP_CHECK(hipFree(d_out));
++
++  if (errors == 0) {
++    printf("PASSED!\n");
++  } else {
++    printf("FAILED! - %d errors\n", errors);
++  }
++  return errors ? 1 : 0;
++}
+diff --git a/tests/opencl/softmax/Makefile b/tests/opencl/softmax/Makefile
+new file mode 100644
+index 0000000..67c3d5d
+--- /dev/null
++++ b/tests/opencl/softmax/Makefile
+@@ -0,0 +1,22 @@
++ROOT_DIR := $(realpath ../../..)
++include $(ROOT_DIR)/config.mk
++
++PROJECT := softmax
++
++SRC_DIR := $(VORTEX_HOME)/tests/opencl/$(PROJECT)
++
++SRCS := $(SRC_DIR)/main.cc
++
++# Device source, copied next to the host binary as ./kernel.cl on every build.
++# Edit the copy in the source tree; KERNEL=<file> selects another file of this
++# directory (e.g. KERNEL=kernel_l2.cl).
++KERNEL ?= kernel.cl
++
++kernel.cl: $(SRC_DIR)/$(KERNEL) FORCE
++	cp $< $@
++
++KERNEL_SRCS := kernel.cl
++
++OPTS ?= -n64
++
++include ../common.mk
+diff --git a/tests/opencl/softmax/kernel.cl b/tests/opencl/softmax/kernel.cl
+new file mode 100644
+index 0000000..e0e79c3
+--- /dev/null
++++ b/tests/opencl/softmax/kernel.cl
+@@ -0,0 +1,15 @@
++// Row-wise softmax over a rows x cols row-major matrix.
++//   out[r][c] = exp(in[r][c] - max_r) / sum_c exp(in[r][c] - max_r)
++//
++// Launch: 1-D NDRange, one work-item per row (global size is rows rounded up
++// to the work-group size, so some work-items have no row to process).
++// Use global memory only.
++__kernel void softmax(__global const float* in,
++                      __global float* out,
++                      const uint rows,
++                      const uint cols) {
++  // TODO: compute the row index of this work-item and skip out-of-range rows.
++  // TODO: pass 1 - find the row maximum.
++  // TODO: pass 2 - write exp(x - max) to out and accumulate the row sum.
++  // TODO: pass 3 - divide each output element by the row sum.
++}
+diff --git a/tests/opencl/softmax/main.cc b/tests/opencl/softmax/main.cc
+new file mode 100644
+index 0000000..af43c7f
+--- /dev/null
++++ b/tests/opencl/softmax/main.cc
+@@ -0,0 +1,209 @@
++#include <stdio.h>
++#include <stdlib.h>
++#include <math.h>
++#include <CL/opencl.h>
++#include <unistd.h>
++#include <string.h>
++#include <chrono>
++#include <vector>
++
++#define KERNEL_NAME "softmax"
++
++// exp() is not correctly rounded on the device and the row sum accumulates
++// rounding error over cols terms, so compare with a relative tolerance.
++#define REL_TOL 1e-4
++// Outputs this small are compared with an absolute tolerance of REL_TOL * ABS_FLOOR.
++#define ABS_FLOOR 1e-12
++
++#define CL_CHECK(_expr)                                                \
++   do {                                                                \
++     cl_int _err = _expr;                                              \
++     if (_err == CL_SUCCESS)                                           \
++       break;                                                          \
++     printf("OpenCL Error: '%s' returned %d!\n", #_expr, (int)_err);   \
++     cleanup();                                                        \
++     exit(-1);                                                         \
++   } while (0)
++
++#define CL_CHECK2(_expr)                                               \
++   ({                                                                  \
++     cl_int _err = CL_INVALID_VALUE;                                   \
++     decltype(_expr) _ret = _expr;                                     \
++     if (_err != CL_SUCCESS) {                                         \
++       printf("OpenCL Error: '%s' returned %d!\n", #_expr, (int)_err); \
++       cleanup();                                                      \
++       exit(-1);                                                       \
++     }                                                                 \
++     _ret;                                                             \
++   })
++
++static int read_kernel_file(const char* filename, uint8_t** data, size_t* size) {
++  FILE* fp = fopen(filename, "r");
++  if (NULL == fp) {
++    fprintf(stderr, "Failed to load kernel.\n");
++    return -1;
++  }
++  fseek(fp, 0, SEEK_END);
++  long fsize = ftell(fp);
++  rewind(fp);
++  *data = (uint8_t*)malloc(fsize);
++  *size = fread(*data, 1, fsize, fp);
++  fclose(fp);
++  return 0;
++}
++
++static void softmax_cpu(float* out, const float* in, uint32_t rows, uint32_t cols) {
++  for (uint32_t r = 0; r < rows; ++r) {
++    const float* x = in + r * cols;
++    double m = x[0];
++    for (uint32_t c = 1; c < cols; ++c)
++      m = fmax(m, (double)x[c]);
++    double sum = 0.0;
++    for (uint32_t c = 0; c < cols; ++c)
++      sum += exp((double)x[c] - m);
++    for (uint32_t c = 0; c < cols; ++c)
++      out[r * cols + c] = (float)(exp((double)x[c] - m) / sum);
++  }
++}
++
++cl_device_id device_id = NULL;
++cl_context context = NULL;
++cl_command_queue commandQueue = NULL;
++cl_program program = NULL;
++cl_kernel kernel = NULL;
++cl_mem in_memobj = NULL;
++cl_mem out_memobj = NULL;
++uint8_t* kernel_bin = NULL;
++
++static void cleanup() {
++  if (commandQueue) clReleaseCommandQueue(commandQueue);
++  if (kernel) clReleaseKernel(kernel);
++  if (program) clReleaseProgram(program);
++  if (in_memobj) clReleaseMemObject(in_memobj);
++  if (out_memobj) clReleaseMemObject(out_memobj);
++  if (context) clReleaseContext(context);
++  if (device_id) clReleaseDevice(device_id);
++  if (kernel_bin) free(kernel_bin);
++}
++
++static uint32_t size = 64;
++static float scale = 1.0f;
++
++static void show_usage() {
++  printf("Usage: [-n size (matrix is size x size)] [-s input scale] [-h: help]\n");
++}
++
++static void parse_args(int argc, char** argv) {
++  int c;
++  while ((c = getopt(argc, argv, "n:s:h")) != -1) {
++    switch (c) {
++    case 'n': size = atoi(optarg); break;
++    case 's': scale = atof(optarg); break;
++    case 'h': show_usage(); exit(0);
++    default:  show_usage(); exit(-1);
++    }
++  }
++  printf("Workload size=%ux%u, input range=[0, %g)\n", size, size, scale);
++}
++
++int main(int argc, char** argv) {
++  parse_args(argc, argv);
++
++  uint32_t rows = size;
++  uint32_t cols = size;
++  size_t nbytes = (size_t)rows * cols * sizeof(float);
++
++  std::vector<float> h_in(rows * cols);
++  std::vector<float> h_out(rows * cols);
++  std::vector<float> h_ref(rows * cols);
++  srand(50);
++  for (auto& v : h_in)
++    v = scale * (static_cast<float>(rand()) / static_cast<float>(RAND_MAX));
++
++  cl_platform_id platform_id;
++  CL_CHECK(clGetPlatformIDs(1, &platform_id, NULL));
++  CL_CHECK(clGetDeviceIDs(platform_id, CL_DEVICE_TYPE_DEFAULT, 1, &device_id, NULL));
++
++  printf("Create context\n");
++  context = CL_CHECK2(clCreateContext(NULL, 1, &device_id, NULL, NULL, &_err));
++
++  printf("Allocate device buffers\n");
++  in_memobj = CL_CHECK2(clCreateBuffer(context, CL_MEM_READ_ONLY, nbytes, NULL, &_err));
++  out_memobj = CL_CHECK2(clCreateBuffer(context, CL_MEM_READ_WRITE, nbytes, NULL, &_err));
++
++  printf("Create program from kernel source\n");
++  size_t kernel_size;
++  if (0 != read_kernel_file("kernel.cl", &kernel_bin, &kernel_size))
++    return -1;
++  program = CL_CHECK2(clCreateProgramWithSource(
++    context, 1, (const char**)&kernel_bin, &kernel_size, &_err));
++
++  auto tb0 = std::chrono::high_resolution_clock::now();
++  cl_int build_err = clBuildProgram(program, 1, &device_id, NULL, NULL, NULL);
++  if (build_err != CL_SUCCESS) {
++    size_t log_size = 0;
++    clGetProgramBuildInfo(program, device_id, CL_PROGRAM_BUILD_LOG, 0, NULL, &log_size);
++    std::vector<char> log(log_size + 1, 0);
++    clGetProgramBuildInfo(program, device_id, CL_PROGRAM_BUILD_LOG, log_size, log.data(), NULL);
++    printf("Build log:\n%s\n", log.data());
++    CL_CHECK(build_err);
++  }
++  auto tb1 = std::chrono::high_resolution_clock::now();
++  printf("Program build time: %lld ms\n",
++         (long long)std::chrono::duration_cast<std::chrono::milliseconds>(tb1 - tb0).count());
++
++  kernel = CL_CHECK2(clCreateKernel(program, KERNEL_NAME, &_err));
++  CL_CHECK(clSetKernelArg(kernel, 0, sizeof(cl_mem), &in_memobj));
++  CL_CHECK(clSetKernelArg(kernel, 1, sizeof(cl_mem), &out_memobj));
++  CL_CHECK(clSetKernelArg(kernel, 2, sizeof(cl_uint), &rows));
++  CL_CHECK(clSetKernelArg(kernel, 3, sizeof(cl_uint), &cols));
++
++  commandQueue = CL_CHECK2(clCreateCommandQueue(context, device_id, 0, &_err));
++
++  printf("Upload source buffer\n");
++  CL_CHECK(clEnqueueWriteBuffer(commandQueue, in_memobj, CL_TRUE, 0, nbytes, h_in.data(), 0, NULL, NULL));
++
++  // One work-item per row; the work-group is as large as the device allows.
++  size_t max_wg = 0;
++  CL_CHECK(clGetKernelWorkGroupInfo(kernel, device_id, CL_KERNEL_WORK_GROUP_SIZE,
++                                    sizeof(max_wg), &max_wg, NULL));
++  size_t local_size = (max_wg < rows) ? max_wg : rows;
++  size_t global_size = ((rows + local_size - 1) / local_size) * local_size;
++  printf("Execute the kernel: global=%zu, local=%zu (device max=%zu)\n",
++         global_size, local_size, max_wg);
++
++  auto t0 = std::chrono::high_resolution_clock::now();
++  CL_CHECK(clEnqueueNDRangeKernel(commandQueue, kernel, 1, NULL, &global_size, &local_size, 0, NULL, NULL));
++  CL_CHECK(clFinish(commandQueue));
++  auto t1 = std::chrono::high_resolution_clock::now();
++  printf("Elapsed time: %lld ms\n",
++         (long long)std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count());
++
++  printf("Download destination buffer\n");
++  CL_CHECK(clEnqueueReadBuffer(commandQueue, out_memobj, CL_TRUE, 0, nbytes, h_out.data(), 0, NULL, NULL));
++
++  printf("Verify result\n");
++  softmax_cpu(h_ref.data(), h_in.data(), rows, cols);
++  int errors = 0;
++  double max_rel = 0.0;
++  for (uint32_t i = 0; i < rows * cols; ++i) {
++    double rel = fabs((double)h_out[i] - h_ref[i]) / fmax((double)h_ref[i], ABS_FLOOR);
++    if (!(rel <= REL_TOL)) {
++      if (errors < 100)
++        printf("*** error: [%u][%u] expected=%g, actual=%g\n", i / cols, i % cols, h_ref[i], h_out[i]);
++      ++errors;
++    }
++    if (rel > max_rel)
++      max_rel = rel;
++  }
++  printf("Max relative error: %.3g\n", max_rel);
++
++  cleanup();
++
++  if (0 == errors) {
++    printf("PASSED!\n");
++  } else {
++    printf("FAILED! - %d errors\n", errors);
++  }
++  return errors ? 1 : 0;
++}
+diff --git a/tests/vulkan/softmax/Makefile b/tests/vulkan/softmax/Makefile
+new file mode 100644
+index 0000000..854ca77
+--- /dev/null
++++ b/tests/vulkan/softmax/Makefile
+@@ -0,0 +1,28 @@
++# Copyright © 2026  Vortex GPGPU
++# SPDX-License-Identifier: MIT
++#
++# Row-wise softmax compute kernel (softmax.comp) run through lavapipe +
++# vortexpipe on the Vortex device, checked on the host.
++#
++#   make                                  -- build the host binary + SPIR-V
++#   make run-simx                         -- run on Vortex via vortexpipe
++#   make run-simx KERNEL=<file>.comp      -- run another shader of this directory
++
++ROOT_DIR := $(realpath ../../..)
++include $(ROOT_DIR)/config.mk
++
++PROJECT := softmax
++
++SRC_DIR := $(VORTEX_HOME)/tests/vulkan/$(PROJECT)
++
++SRCS := $(SRC_DIR)/main.c
++
++KERNEL ?= softmax.comp
++
++SHADERS := $(SRC_DIR)/$(KERNEL)
++
++LDLIBS += -lm
++
++OPTS ?= -n64
++
++include ../common.mk
+diff --git a/tests/vulkan/softmax/main.c b/tests/vulkan/softmax/main.c
+new file mode 100644
+index 0000000..1521216
+--- /dev/null
++++ b/tests/vulkan/softmax/main.c
+@@ -0,0 +1,388 @@
++/*
++ * Copyright © 2026  Vortex GPGPU
++ * SPDX-License-Identifier: MIT
++ *
++ * Row-wise softmax over a size x size float matrix, computed by
++ * softmax.comp through lavapipe + vortexpipe on the Vortex device and
++ * checked against a double-precision host reference.
++ *
++ * Usage: softmax <shader.spv> [-n size] [-s input scale]
++ */
++
++#include <vulkan/vulkan.h>
++#include <math.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <time.h>
++#include <unistd.h>
++
++/* exp() is not correctly rounded on the device and the row sum accumulates
++ * rounding error over cols terms, so compare with a relative tolerance. */
++#define REL_TOL 1e-4
++// Outputs this small are compared with an absolute tolerance of REL_TOL * ABS_FLOOR.
++#define ABS_FLOOR 1e-12
++
++#define CHECK(x) do {                                              \
++   VkResult _r = (x);                                              \
++   if (_r != VK_SUCCESS) {                                         \
++      fprintf(stderr, "FAILED: %s -> VkResult %d\n", #x, (int)_r); \
++      return 1;                                                    \
++   }                                                               \
++} while (0)
++
++struct params {
++   uint32_t rows;
++   uint32_t cols;
++};
++
++static uint32_t *
++read_spirv(const char *path, size_t *out_size)
++{
++   FILE *f = fopen(path, "rb");
++   if (!f) { fprintf(stderr, "FAILED: cannot open %s\n", path); return NULL; }
++   fseek(f, 0, SEEK_END);
++   long sz = ftell(f);
++   fseek(f, 0, SEEK_SET);
++   uint32_t *buf = malloc((size_t)sz);
++   if (buf && fread(buf, 1, (size_t)sz, f) != (size_t)sz) { free(buf); buf = NULL; }
++   fclose(f);
++   if (buf) *out_size = (size_t)sz;
++   return buf;
++}
++
++static double
++now_ms(void)
++{
++   struct timespec ts;
++   clock_gettime(CLOCK_MONOTONIC, &ts);
++   return ts.tv_sec * 1e3 + ts.tv_nsec / 1e6;
++}
++
++static void
++softmax_cpu(float *out, const float *in, uint32_t rows, uint32_t cols)
++{
++   for (uint32_t r = 0; r < rows; r++) {
++      const float *x = in + (size_t)r * cols;
++      double m = x[0];
++      for (uint32_t c = 1; c < cols; c++)
++         m = fmax(m, (double)x[c]);
++      double sum = 0.0;
++      for (uint32_t c = 0; c < cols; c++)
++         sum += exp((double)x[c] - m);
++      for (uint32_t c = 0; c < cols; c++)
++         out[(size_t)r * cols + c] = (float)(exp((double)x[c] - m) / sum);
++   }
++}
++
++/* Buffer backed by its own host-visible, host-coherent allocation. */
++static VkResult
++create_buffer(VkDevice dev, const VkPhysicalDeviceMemoryProperties *mp,
++              VkDeviceSize bytes, VkBufferUsageFlags usage,
++              VkBuffer *buf, VkDeviceMemory *mem)
++{
++   VkBufferCreateInfo bci = {
++      .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
++      .size = bytes, .usage = usage,
++      .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
++   };
++   VkResult r = vkCreateBuffer(dev, &bci, NULL, buf);
++   if (r != VK_SUCCESS)
++      return r;
++
++   VkMemoryRequirements mr;
++   vkGetBufferMemoryRequirements(dev, *buf, &mr);
++
++   const VkMemoryPropertyFlags want =
++      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
++   uint32_t mt = UINT32_MAX;
++   for (uint32_t i = 0; i < mp->memoryTypeCount; i++)
++      if ((mr.memoryTypeBits & (1u << i)) &&
++          (mp->memoryTypes[i].propertyFlags & want) == want) { mt = i; break; }
++   if (mt == UINT32_MAX)
++      return VK_ERROR_FEATURE_NOT_PRESENT;
++
++   VkMemoryAllocateInfo mai = {
++      .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
++      .allocationSize = mr.size, .memoryTypeIndex = mt,
++   };
++   r = vkAllocateMemory(dev, &mai, NULL, mem);
++   if (r != VK_SUCCESS)
++      return r;
++   return vkBindBufferMemory(dev, *buf, *mem, 0);
++}
++
++int
++main(int argc, char **argv)
++{
++   uint32_t size = 64;
++   float scale = 1.0f;
++   int c;
++   while ((c = getopt(argc, argv, "n:s:h")) != -1) {
++      switch (c) {
++      case 'n': size = (uint32_t)atoi(optarg); break;
++      case 's': scale = (float)atof(optarg); break;
++      default:
++         printf("Usage: %s <shader.spv> [-n size (matrix is size x size)] [-s input scale]\n", argv[0]);
++         return c == 'h' ? 0 : 1;
++      }
++   }
++   const char *spv_path = (optind < argc) ? argv[optind] : "softmax.comp.spv";
++   printf("Workload size=%ux%u, input range=[0, %g)\n", size, size, scale);
++
++   const uint32_t rows = size, cols = size;
++   const size_t count = (size_t)rows * cols;
++   const VkDeviceSize bytes = count * sizeof(float);
++
++   float *h_in = malloc(bytes);
++   float *h_ref = malloc(bytes);
++   srand(50);
++   for (size_t i = 0; i < count; i++)
++      h_in[i] = scale * ((float)rand() / (float)RAND_MAX);
++
++   /* --- instance + physical device -------------------------------- */
++   VkApplicationInfo app = {
++      .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
++      .pApplicationName = "vortex-softmax",
++      .apiVersion = VK_API_VERSION_1_1,
++   };
++   VkInstanceCreateInfo ici = {
++      .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
++      .pApplicationInfo = &app,
++   };
++   VkInstance inst;
++   CHECK(vkCreateInstance(&ici, NULL, &inst));
++
++   uint32_t npd = 1;
++   VkPhysicalDevice pd;
++   CHECK(vkEnumeratePhysicalDevices(inst, &npd, &pd));
++   if (npd == 0) { fprintf(stderr, "FAILED: no physical device\n"); return 1; }
++
++   VkPhysicalDeviceProperties props;
++   vkGetPhysicalDeviceProperties(pd, &props);
++   printf("device: %s\n", props.deviceName);
++
++   uint32_t nqf = 0;
++   vkGetPhysicalDeviceQueueFamilyProperties(pd, &nqf, NULL);
++   VkQueueFamilyProperties *qfp = calloc(nqf, sizeof(*qfp));
++   vkGetPhysicalDeviceQueueFamilyProperties(pd, &nqf, qfp);
++   uint32_t qf = UINT32_MAX;
++   for (uint32_t i = 0; i < nqf; i++)
++      if (qfp[i].queueFlags & VK_QUEUE_COMPUTE_BIT) { qf = i; break; }
++   free(qfp);
++   if (qf == UINT32_MAX) { fprintf(stderr, "FAILED: no compute queue\n"); return 1; }
++
++   /* --- logical device + queue ------------------------------------ */
++   float prio = 1.0f;
++   VkDeviceQueueCreateInfo qci = {
++      .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
++      .queueFamilyIndex = qf, .queueCount = 1, .pQueuePriorities = &prio,
++   };
++   VkDeviceCreateInfo dci = {
++      .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
++      .queueCreateInfoCount = 1, .pQueueCreateInfos = &qci,
++   };
++   VkDevice dev;
++   CHECK(vkCreateDevice(pd, &dci, NULL, &dev));
++   VkQueue queue;
++   vkGetDeviceQueue(dev, qf, 0, &queue);
++
++   /* --- buffers ---------------------------------------------------- */
++   VkPhysicalDeviceMemoryProperties mp;
++   vkGetPhysicalDeviceMemoryProperties(pd, &mp);
++   VkBuffer in_buf, out_buf, par_buf;
++   VkDeviceMemory in_mem, out_mem, par_mem;
++   CHECK(create_buffer(dev, &mp, bytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, &in_buf, &in_mem));
++   CHECK(create_buffer(dev, &mp, bytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, &out_buf, &out_mem));
++   /* rows/cols go in a uniform buffer: push constants hang the vortexpipe
++    * compute path in this release (the kernel never retires). */
++   CHECK(create_buffer(dev, &mp, sizeof(struct params), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
++                       &par_buf, &par_mem));
++
++   float *p;
++   CHECK(vkMapMemory(dev, in_mem, 0, bytes, 0, (void **)&p));
++   memcpy(p, h_in, bytes);
++   vkUnmapMemory(dev, in_mem);
++
++   struct params *pp;
++   CHECK(vkMapMemory(dev, par_mem, 0, sizeof(*pp), 0, (void **)&pp));
++   pp->rows = rows;
++   pp->cols = cols;
++   vkUnmapMemory(dev, par_mem);
++
++   /* --- shader module --------------------------------------------- */
++   size_t spv_size = 0;
++   uint32_t *spv = read_spirv(spv_path, &spv_size);
++   if (!spv) return 1;
++   VkShaderModuleCreateInfo smci = {
++      .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
++      .codeSize = spv_size, .pCode = spv,
++   };
++   VkShaderModule sm;
++   CHECK(vkCreateShaderModule(dev, &smci, NULL, &sm));
++   free(spv);
++
++   /* --- descriptor set layout: 0 = in, 1 = out, 2 = params ------- */
++   VkDescriptorSetLayoutBinding dslb[3] = {
++      { .binding = 0, .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
++        .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT },
++      { .binding = 1, .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
++        .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT },
++      { .binding = 2, .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
++        .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT },
++   };
++   VkDescriptorSetLayoutCreateInfo dslci = {
++      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
++      .bindingCount = 3, .pBindings = dslb,
++   };
++   VkDescriptorSetLayout dsl;
++   CHECK(vkCreateDescriptorSetLayout(dev, &dslci, NULL, &dsl));
++
++   VkPipelineLayoutCreateInfo plci = {
++      .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
++      .setLayoutCount = 1, .pSetLayouts = &dsl,
++   };
++   VkPipelineLayout pl;
++   CHECK(vkCreatePipelineLayout(dev, &plci, NULL, &pl));
++
++   /* --- one invocation per row; the work-group is as large as the device allows */
++   uint32_t dev_max_x = props.limits.maxComputeWorkGroupSize[0];
++   uint32_t local_size = dev_max_x < rows ? dev_max_x : rows;
++   uint32_t groups = (rows + local_size - 1) / local_size;
++   printf("Execute the kernel: groups=%u, local_size_x=%u (device max=%u)\n",
++          groups, local_size, dev_max_x);
++
++   VkSpecializationMapEntry sme = {
++      .constantID = 0, .offset = 0, .size = sizeof(uint32_t),
++   };
++   VkSpecializationInfo spec_info = {
++      .mapEntryCount = 1, .pMapEntries = &sme,
++      .dataSize = sizeof(uint32_t), .pData = &local_size,
++   };
++   VkComputePipelineCreateInfo cpci = {
++      .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
++      .stage = {
++         .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
++         .stage = VK_SHADER_STAGE_COMPUTE_BIT, .module = sm, .pName = "main",
++         .pSpecializationInfo = &spec_info,
++      },
++      .layout = pl,
++   };
++   VkPipeline pipe;
++   double tb0 = now_ms();
++   CHECK(vkCreateComputePipelines(dev, VK_NULL_HANDLE, 1, &cpci, NULL, &pipe));
++   printf("Pipeline build time: %.0f ms\n", now_ms() - tb0);
++
++   /* --- descriptor set -------------------------------------------- */
++   VkDescriptorPoolSize dps[2] = {
++      { .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .descriptorCount = 2 },
++      { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = 1 },
++   };
++   VkDescriptorPoolCreateInfo dpci = {
++      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
++      .maxSets = 1, .poolSizeCount = 2, .pPoolSizes = dps,
++   };
++   VkDescriptorPool dp;
++   CHECK(vkCreateDescriptorPool(dev, &dpci, NULL, &dp));
++
++   VkDescriptorSetAllocateInfo dsai = {
++      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
++      .descriptorPool = dp, .descriptorSetCount = 1, .pSetLayouts = &dsl,
++   };
++   VkDescriptorSet ds;
++   CHECK(vkAllocateDescriptorSets(dev, &dsai, &ds));
++
++   VkDescriptorBufferInfo dbi[2] = {
++      { .buffer = in_buf,  .offset = 0, .range = bytes },
++      { .buffer = out_buf, .offset = 0, .range = bytes },
++   };
++   VkDescriptorBufferInfo pbi = { .buffer = par_buf, .offset = 0, .range = sizeof(struct params) };
++   VkWriteDescriptorSet wds[2] = {
++      { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
++        .dstSet = ds, .dstBinding = 0, .descriptorCount = 2,
++        .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .pBufferInfo = dbi },
++      { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
++        .dstSet = ds, .dstBinding = 2, .descriptorCount = 1,
++        .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .pBufferInfo = &pbi },
++   };
++   vkUpdateDescriptorSets(dev, 2, wds, 0, NULL);
++
++   /* --- command buffer: bind + dispatch --------------------------- */
++   VkCommandPoolCreateInfo cmpci = {
++      .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
++      .queueFamilyIndex = qf,
++   };
++   VkCommandPool cp;
++   CHECK(vkCreateCommandPool(dev, &cmpci, NULL, &cp));
++
++   VkCommandBufferAllocateInfo cbai = {
++      .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
++      .commandPool = cp, .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
++      .commandBufferCount = 1,
++   };
++   VkCommandBuffer cb;
++   CHECK(vkAllocateCommandBuffers(dev, &cbai, &cb));
++
++   VkCommandBufferBeginInfo cbbi = {
++      .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
++      .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
++   };
++   CHECK(vkBeginCommandBuffer(cb, &cbbi));
++   vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
++   vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_COMPUTE, pl,
++                           0, 1, &ds, 0, NULL);
++   vkCmdDispatch(cb, groups, 1, 1);
++   CHECK(vkEndCommandBuffer(cb));
++
++   VkSubmitInfo si = {
++      .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
++      .commandBufferCount = 1, .pCommandBuffers = &cb,
++   };
++   double t0 = now_ms();
++   CHECK(vkQueueSubmit(queue, 1, &si, VK_NULL_HANDLE));
++   CHECK(vkQueueWaitIdle(queue));
++   printf("Elapsed time: %.0f ms\n", now_ms() - t0);
++
++   /* --- read back + verify ---------------------------------------- */
++   softmax_cpu(h_ref, h_in, rows, cols);
++   CHECK(vkMapMemory(dev, out_mem, 0, bytes, 0, (void **)&p));
++   unsigned errors = 0;
++   double max_rel = 0.0;
++   for (size_t i = 0; i < count; i++) {
++      double rel = fabs((double)p[i] - h_ref[i]) / fmax((double)h_ref[i], ABS_FLOOR);
++      if (!(rel <= REL_TOL)) {
++         if (errors < 100)
++            printf("*** error: [%zu][%zu] expected=%g, actual=%g\n",
++                   i / cols, i % cols, h_ref[i], p[i]);
++         errors++;
++      }
++      if (rel > max_rel)
++         max_rel = rel;
++   }
++   vkUnmapMemory(dev, out_mem);
++   printf("Max relative error: %.3g\n", max_rel);
++
++   vkDestroyCommandPool(dev, cp, NULL);
++   vkDestroyDescriptorPool(dev, dp, NULL);
++   vkDestroyPipeline(dev, pipe, NULL);
++   vkDestroyPipelineLayout(dev, pl, NULL);
++   vkDestroyDescriptorSetLayout(dev, dsl, NULL);
++   vkDestroyShaderModule(dev, sm, NULL);
++   vkFreeMemory(dev, in_mem, NULL);
++   vkFreeMemory(dev, out_mem, NULL);
++   vkFreeMemory(dev, par_mem, NULL);
++   vkDestroyBuffer(dev, in_buf, NULL);
++   vkDestroyBuffer(dev, out_buf, NULL);
++   vkDestroyBuffer(dev, par_buf, NULL);
++   vkDestroyDevice(dev, NULL);
++   vkDestroyInstance(inst, NULL);
++   free(h_in);
++   free(h_ref);
++
++   if (errors) {
++      printf("FAILED! - %u errors\n", errors);
++      return 1;
++   }
++   printf("PASSED!\n");
++   return 0;
++}
+diff --git a/tests/vulkan/softmax/softmax.comp b/tests/vulkan/softmax/softmax.comp
+new file mode 100644
+index 0000000..e3c4012
+--- /dev/null
++++ b/tests/vulkan/softmax/softmax.comp
+@@ -0,0 +1,31 @@
++#version 450
++
++// Row-wise softmax over a rows x cols row-major matrix.
++//   y[r][c] = exp(x[r][c] - max_r) / sum_c exp(x[r][c] - max_r)
++//
++// Launch: one invocation per row (the dispatch is rows rounded up to the
++// work-group size, so some invocations have no row to process).
++// Use the storage buffers only.
++
++layout(local_size_x_id = 0) in;
++
++layout(std430, binding = 0) readonly buffer In {
++   float x[];
++};
++
++layout(std430, binding = 1) buffer Out {
++   float y[];
++};
++
++layout(std140, binding = 2) uniform Params {
++   uint rows;
++   uint cols;
++};
++
++void main()
++{
++   // TODO: compute the row index of this invocation and skip out-of-range rows.
++   // TODO: pass 1 - find the row maximum.
++   // TODO: pass 2 - write exp(x - max) to y and accumulate the row sum.
++   // TODO: pass 3 - divide each output element by the row sum.
++}

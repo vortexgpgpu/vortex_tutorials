@@ -1,0 +1,3 @@
+size,native_instrs,native_cycles,cupbop_instrs,cupbop_cycles,config
+64x64,6814,55677,18272,85803,"SimX XLEN 64, 4 cores x 16 warps x 32 threads, L2, A+Zacas"
+128x128,25610,169734,39614,202630,"SimX XLEN 64, 4 cores x 16 warps x 32 threads, L2, A+Zacas"
