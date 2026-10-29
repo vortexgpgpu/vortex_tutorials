@@ -1,16 +1,12 @@
-> **MICRO 2026 (Vortex v3.0, image `vortex_micro26.sif`).** Items marked **TODO** depend on the final Rogues Gallery
-> deployment: the access period, the registration form, the login address, the tutorial repository links, and the
-> paths under `/projects/tools/...` (proposed, not yet created).
-
 # Vortex Tutorial - Remote Option
 
-We suggest that you use a remote server hosted by the [CRNCH Rogues Gallery](https://crnch-rg.cc.gatech.edu/). This option will be available until the end of the conference (**TODO:** confirm the end date for MICRO 2026).
+We suggest that you use a remote server hosted by the [CRNCH Rogues Gallery](https://crnch-rg.cc.gatech.edu/). This option will be available until the end of the conference
 
 ## Register for access
-Please use the [form to submit your Github ID](https://forms.office.com/r/CynuGzyeDD) to reserve a slot to use for the duration of the tutorial. (**TODO:** confirm the form link for 2026.)
+Please use the [form to submit your Github ID](https://forms.cloud.microsoft/r/mbwyQcr9eE) to reserve a slot to use for the duration of the tutorial.
 
 ## Login
-Login to `crush.crnch.gatech.edu/jupyter` using your Github account. (**TODO:** confirm the login address for 2026.)
+Login to `crush.crnch.gatech.edu/jupyter` using your Github account. 
 
  | **Note:** Participants have to agree / authorize to join the "gt-crnch-rg" team to get access. We do not get the password; This is just the authentication from GitHub that the user is a valid user.
 
@@ -31,7 +27,7 @@ $ pwd
 Everything you create (clones, builds, edits) must live in a directory on the server, not inside the container: the container's own writable space is only 64 MB.
 ```
 $	git clone --branch v3.0 --recursive https://github.com/vortexgpgpu/vortex.git
-$	git clone https://github.com/vortexgpgpu/vortex_tutorials.git      # TODO: confirm the tutorial repository URL
+$	git clone https://github.com/vortexgpgpu/vortex_tutorials.git      
 $	mkdir work
 ```
 
@@ -50,7 +46,6 @@ $   apptainer shell --fakeroot --cleanenv --writable-tmpfs \
     /projects/tools/x86_64/containers/vortex_micro26.sif
 ```
 
-(**TODO:** confirm the two `/projects/tools/...` paths once the Rogues Gallery team has installed the toolchain directory and the image.)
 
 ### Build Vortex inside Apptainer
 
@@ -85,4 +80,4 @@ Apptainer> ./ci/blackbox.sh --cores=2 --app=vecadd --driver=xrt
 
 ### The exercises
 
-Follow the [exercises](https://github.com/vortexgpgpu/vortex_tutorials/tree/main/Exercises) in the tutorial repository (**TODO:** confirm the link).
+Follow the [exercises](https://github.com/vortexgpgpu/vortex_tutorials/tree/main/Exercises) in the tutorial repository
