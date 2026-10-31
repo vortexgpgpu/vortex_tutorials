@@ -42,8 +42,8 @@ $   apptainer shell --fakeroot --cleanenv --writable-tmpfs \
     --bind ./vortex:/home/vortex \
     --bind ./vortex_tutorials:/home/vortex_tutorials \
     --bind ./work:/home/work \
-    --bind /projects/tools/x86_64/common-tools/vortex-tools-v3.0:/home/tools \
-    /projects/tools/x86_64/containers/vortex_micro26.sif
+    --bind /netscratch/tutorials/micro-tutorial-2026/vortex-tools-v3.0:/home/tools \
+    /netscratch/tutorials/micro-tutorial-2026/vortex_micro26.sif
 ```
 
 
