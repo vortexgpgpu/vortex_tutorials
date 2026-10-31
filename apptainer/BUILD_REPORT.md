@@ -7,16 +7,11 @@ Based on Vortex **v3.0** (tag `v3.0`, commit `7fe19369587c087f902c3e2bc2add612aa
 
 | | Path |
 |---|---|
-| Image | `/localscratch/ypark449/vortex_micro26.sif` (585 MB) |
+| Image | `/netscratch/tutorials/micro-tutorial-2026/vortex_micro26.sif` (585 MB) |
 | Definition file | `apptainer/vortex_micro26.def` (this repository) |
-| Toolchain directory (mounted at `/home/tools`) | `/localscratch/ypark449/vortex-tools-v3.0/` (3.7 GB) |
+| Toolchain directory (mounted at `/home/tools`) | `/netscratch/tutorials/micro-tutorial-2026/vortex-tools-v3.0/` (3.7 GB) |
 
-All three are on `crush`'s node-local `/localscratch` (no backup). Proposed final placement, to be created by the RG admins:
-
-```
-/projects/tools/x86_64/containers/vortex_micro26.sif
-/projects/tools/x86_64/common-tools/vortex-tools-v3.0
-```
+The image and the toolchain directory are installed under `/netscratch/tutorials/micro-tutorial-2026/` (installed by the RG admins; the originals were built on `crush`'s node-local `/localscratch/ypark449/`, which has no backup). Both can be rebuilt from the definition file with the steps below.
 
 The image contains only OS packages: Vortex's `ci/install_dependencies.sh --vulkan` set (Vulkan loader, `glslc`, OpenCL headers, cmake, ...), the CUDA 12.1 headers (`cuda-cudart-dev`, `cuda-nvcc`, `cuda-driver-dev`, `libcurand-dev`; no GPU needed), `libtinfo-dev`, `libunwind8`, vim, nano, gtkwave and matplotlib. The Vortex source tree and the toolchain are bind-mounted from the host. `TOOLDIR` is set at run time to whichever of `/opt/vortex-tools` or `/home/tools` is mounted (Vortex's `config.mk` uses `TOOLDIR ?=`, so an exported `TOOLDIR` must match the mount).
 
@@ -55,8 +50,8 @@ Result: `chipstar gem5 libc32 libc64 libcrt32 libcrt64 llvm-vortex mesa-vortex p
 git clone --branch v3.0 --recursive https://github.com/vortexgpgpu/vortex.git /tmp/vortex
 apptainer shell --fakeroot --cleanenv --writable-tmpfs \
   --bind /tmp/vortex:/home/vortex \
-  --bind /localscratch/ypark449/vortex-tools-v3.0:/home/tools \
-  /localscratch/ypark449/vortex_micro26.sif
+  --bind /netscratch/tutorials/micro-tutorial-2026/vortex-tools-v3.0:/home/tools \
+  /netscratch/tutorials/micro-tutorial-2026/vortex_micro26.sif
 Apptainer> cd /home/vortex && mkdir build32 && cd build32
 Apptainer> ../configure --xlen=32 --tooldir=$TOOLDIR       # TOOLDIR=/home/tools
 Apptainer> make -s -j4
