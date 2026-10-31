@@ -6,9 +6,9 @@ We suggest that you use a remote server hosted by the [CRNCH Rogues Gallery](htt
 Please use the [form to submit your Github ID](https://forms.cloud.microsoft/r/mbwyQcr9eE) to reserve a slot to use for the duration of the tutorial.
 
 ## Login
-Login to `crush.crnch.gatech.edu/jupyter` using your Github account. 
+Login to `rg-hub.crnch.gatech.edu/jupyter` using your Github account. 
 
- | **Note:** Participants have to agree / authorize to join the "gt-crnch-rg" team to get access. We do not get the password; This is just the authentication from GitHub that the user is a valid user.
+ | **Note:** Participants do not need a password to log in. They have to agree / authorize to join the "gt-crnch-rg" GitHub team to get access, and their GitHub username and password is used for authentication.
 
 Then, click "Start My Server".
 
@@ -26,8 +26,8 @@ $ pwd
 ### Get the code
 Everything you create (clones, builds, edits) must live in a directory on the server, not inside the container: the container's own writable space is only 64 MB.
 ```
-$	git clone --branch v3.0 --recursive https://github.com/vortexgpgpu/vortex.git
-$	git clone https://github.com/vortexgpgpu/vortex_tutorials.git      
+$	git clone --branch v3.0 --recursive --depth 1 https://github.com/vortexgpgpu/vortex.git
+$	git clone --depth 1 https://github.com/vortexgpgpu/vortex_tutorials.git      
 $	mkdir work
 ```
 
@@ -38,7 +38,7 @@ The command
 * mounts your Vortex clone, the tutorial repository, a work directory and the shared toolchain onto the apptainer
 
 ```
-$   apptainer shell --fakeroot --cleanenv --writable-tmpfs \
+$   apptainer shell --cleanenv --writable-tmpfs \
     --bind ./vortex:/home/vortex \
     --bind ./vortex_tutorials:/home/vortex_tutorials \
     --bind ./work:/home/work \
